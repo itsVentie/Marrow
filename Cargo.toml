@@ -5,7 +5,7 @@ members = [
     "crates/storage",
     "crates/network",
     "crates/protocol",
-    "apps/desktop/src-tauri",
+    "apps/Ratcher/src-tauri",
     "apps/relay"
 ]
 
@@ -16,7 +16,10 @@ x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 chacha20poly1305 = "0.10"
 argon2 = "0.5"
 rand = "0.8"
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1.3"
-quinn = "0.11"
+hex = "0.4"
 thiserror = "1.0"
+redb = "2.1"
+quinn = "0.11"

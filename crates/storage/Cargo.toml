@@ -1,0 +1,15 @@
+[package]
+name = "r-storage"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+r-crypto = { path = "../crypto" }
+redb.workspace = true
+serde.workspace = true
+bincode.workspace = true
+thiserror.workspace = true
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
+
+[dev-dependencies]
+tempfile = "3.10"
