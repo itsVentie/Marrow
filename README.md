@@ -1,5 +1,9 @@
 # Marrow
 
+> [!WARNING]
+> **This project is under active development.**
+> The current version may contain bugs, incomplete or non-functional features, and breaking changes without prior notice. Use at your own risk.
+
 > High-performance, zero-trust, post-quantum resilient desktop communication suite built with Rust, Tauri v2, and Preact.
 
 ---
