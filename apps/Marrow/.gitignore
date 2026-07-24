@@ -33,8 +33,8 @@ dist/
 /**/dist/
 dist-isolation/
 .vite/
-apps/Ratcher/src-tauri/target/
-apps/Ratcher/src-tauri/gen/
+apps/marrow/src-tauri/target/
+apps/marrow/src-tauri/gen/
 .env
 .env.*
 !.env.example

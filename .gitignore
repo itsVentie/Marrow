@@ -5,7 +5,7 @@ node_modules/
 dist/
 .pnpm-debug.log*
 pnpm-debug.log*
-apps/Ratcher/src-tauri/target/
+apps/marrow/src-tauri/target/
 .vscode/
 .idea/
 *.swp

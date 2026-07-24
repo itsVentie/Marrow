@@ -5,7 +5,7 @@ members = [
     "crates/storage",
     "crates/network",
     "crates/protocol",
-    "apps/Ratcher/src-tauri",
+    "apps/marrow/src-tauri",
     "apps/relay"
 ]
 

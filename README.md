@@ -1,4 +1,4 @@
-# Ratcher
+# Marrow
 
 > High-performance, zero-trust, post-quantum resilient desktop communication suite built with Rust, Tauri v2, and Preact.
 
@@ -6,7 +6,7 @@
 
 ## Security & Architectural Principles
 
-Ratcher is designed with a strict zero-trust philosophy. It operates on isolated cryptographic identities, zero PII requirement, and a memory-safe execution engine.
+marrow is designed with a strict zero-trust philosophy. It operates on isolated cryptographic identities, zero PII requirement, and a memory-safe execution engine.
 
 ### 1. Identity & Cryptography
 * **Identity Management:** Ed25519 asymmetric signature scheme (`ed25519-dalek`). Accounts require no email, phone number, or centralized authority; identities are bound strictly to a local 32-byte seed (`identity.key`).
@@ -42,8 +42,8 @@ Ratcher is designed with a strict zero-trust philosophy. It operates on isolated
 
 * [x] Cargo Workspace setup and modular crate design.
 * [x] Tauri v2 + Preact + TypeScript frontend pipeline initialization.
-* [ ] Implement Ed25519 keypair generation and Argon2id local file encryption in `crates/crypto`.
-* [ ] Build encrypted local KV abstraction over `redb` in `crates/storage`.
+* [x] Implement Ed25519 keypair generation and Argon2id local file encryption in `crates/crypto`.
+* [x] Build encrypted local KV abstraction over `redb` in `crates/storage`.
 
 ### Phase 2: Transport & Handshake Protocol
 
@@ -79,7 +79,7 @@ Ratcher is designed with a strict zero-trust philosophy. It operates on isolated
 
 1. Install frontend dependencies:
 ```bash
-cd apps/Ratcher
+cd apps/marrow
 pnpm install
 
 ```
