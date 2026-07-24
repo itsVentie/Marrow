@@ -104,5 +104,5 @@ pnpm tauri build
 
 ## License
 
-Licensed under Apache-2.0.
+Licensed under GPLv3.
 
