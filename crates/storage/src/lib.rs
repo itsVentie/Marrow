@@ -1,6 +1,6 @@
 use bincode;
 use r_crypto::EncryptedVault;
-use redb::{Database, TableDefinition};
+use redb::{Database, ReadableTable, TableDefinition};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use thiserror::Error;
@@ -100,6 +100,32 @@ impl StorageEngine {
 
         Ok(contact)
     }
+
+    pub fn list_contacts(&self) -> Result<Vec<Contact>, StorageError> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(CONTACTS_TABLE)?;
+        let mut contacts = Vec::new();
+
+        for entry in table.iter()? {
+            let (_key_guard, val_guard) = entry?;
+            let contact: Contact = bincode::deserialize(val_guard.value())
+                .map_err(|_| StorageError::SerializationError)?;
+            contacts.push(contact);
+        }
+
+        Ok(contacts)
+    }
+
+    pub fn delete_contact(&self, pubkey_hex: &str) -> Result<bool, StorageError> {
+        let write_txn = self.db.begin_write()?;
+        let removed = {
+            let mut table = write_txn.open_table(CONTACTS_TABLE)?;
+            let opt = table.remove(pubkey_hex)?;
+            opt.is_some()
+        };
+        write_txn.commit()?;
+        Ok(removed)
+    }
 }
 
 #[cfg(test)]
@@ -114,7 +140,7 @@ mod tests {
         let engine = StorageEngine::open(tmp_file.path()).unwrap();
 
         let identity = Identity::generate();
-        let password = b"master_password_123";
+        let password = b"super_secret_master_password";
         let vault = identity.export_encrypted(password).unwrap();
 
         engine.save_vault(&vault).unwrap();
@@ -134,7 +160,7 @@ mod tests {
 
         let contact = Contact {
             pubkey_hex: "1234567890abcdef".to_string(),
-            alias: "Alice".to_string(),
+            alias: "Ventie".to_string(),
             added_at: 1700000000,
         };
 
@@ -142,5 +168,38 @@ mod tests {
         let loaded_contact = engine.get_contact(&contact.pubkey_hex).unwrap();
 
         assert_eq!(contact, loaded_contact);
+    }
+
+    #[test]
+    fn test_contact_crud_operations() {
+        let tmp_file = NamedTempFile::new().unwrap();
+        let engine = StorageEngine::open(tmp_file.path()).unwrap();
+
+        let c1 = Contact {
+            pubkey_hex: "pubkey_1".to_string(),
+            alias: "Ventie".to_string(),
+            added_at: 100,
+        };
+        let c2 = Contact {
+            pubkey_hex: "pubkey_2".to_string(),
+            alias: "Anek".to_string(),
+            added_at: 200,
+        };
+
+        engine.save_contact(&c1).unwrap();
+        engine.save_contact(&c2).unwrap();
+
+        let contacts = engine.list_contacts().unwrap();
+        assert_eq!(contacts.len(), 2);
+
+        let deleted = engine.delete_contact(&c1.pubkey_hex).unwrap();
+        assert!(deleted);
+
+        let contacts_after = engine.list_contacts().unwrap();
+        assert_eq!(contacts_after.len(), 1);
+        assert_eq!(contacts_after[0], c2);
+
+        let not_found = engine.get_contact(&c1.pubkey_hex);
+        assert!(matches!(not_found, Err(StorageError::NotFound)));
     }
 }
