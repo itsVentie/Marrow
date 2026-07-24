@@ -30,7 +30,7 @@ marrow is designed with a strict zero-trust philosophy. It operates on isolated 
 | :--- | :--- | :--- |
 | **Frontend UI** | Preact + TypeScript + Vite | ~4KB core footprint, signal-based reactivity, strict typings |
 | **GUI Framework** | Tauri v2 | OS-native WebView wrapper, sandboxed IPC, low RAM overhead (~20-30MB) |
-| **Core Engine** | Rust (2024 Edition) | Memory safety without Garbage Collection, explicit zero-allocation targets |
+| **Core Engine** | Rust (2021 Edition) | Memory safety without Garbage Collection, explicit zero-allocation targets |
 | **Networking** | Quinn (QUIC/UDP) | DPI-resistant, multiplexed transport stream |
 | **Local Storage** | `redb` + Argon2id | Embedded, fully encrypted, single-file local persistence |
 
