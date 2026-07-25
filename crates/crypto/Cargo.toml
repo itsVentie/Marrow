@@ -5,14 +5,18 @@ edition = "2021"
 
 [dependencies]
 ed25519-dalek.workspace = true
-x25519-dalek.workspace = true
+x25519-dalek = { workspace = true, features = ["static_secrets"] }
 chacha20poly1305.workspace = true
 argon2.workspace = true
 rand.workspace = true
-zeroize.workspace = true
+zeroize = { workspace = true, features = ["zeroize_derive"] }
 hex.workspace = true
 thiserror.workspace = true
 serde.workspace = true
+ml-kem.workspace = true
+hkdf.workspace = true
+sha2.workspace = true
+rand_core.workspace = true
 
 [dev-dependencies]
 tempfile = "3.10"
