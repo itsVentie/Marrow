@@ -13,6 +13,7 @@
 `marrow` is designed with a strict zero-trust philosophy. It operates on isolated cryptographic identities, zero PII requirement, and a memory-safe execution engine.
 
 ### 1. Identity & Cryptography
+
 * **Identity Management:** Ed25519 asymmetric signature scheme (`ed25519-dalek`). Accounts require no email, phone number, or centralized authority; identities are bound strictly to a local 32-byte seed (`identity.key`).
 * **Post-Quantum Key Exchange:** Hybrid **X25519 + ML-KEM-768** (Kyber) key exchange to protect session initialization against "Harvest Now, Decrypt Later" quantum adversary scenarios.
 * **Forward Secrecy:** Full **Double Ratchet Algorithm** implementation. Session keys mutate on every message exchange, invalidating past and future ciphertexts if a single key is compromised.
@@ -20,12 +21,14 @@
 * **Memory Protection & Zeroization:** Strict zeroization (`zeroize`) on drop for all ephemeral keys, seed states, and raw byte buffers. Critical memory regions containing identity keys and master keys are locked in RAM via OS memory pinning (`mlock` / `VirtualLock`) to prevent page swapping to disk.
 
 ### 2. Networking Layer
+
 * **Transport & Resilience:** Native **QUIC** protocol (`quinn`) over UDP, offering 0-RTT session resumption, multi-path connection migration, and built-in TLS 1.3 encryption. Includes an automatic **TCP/TLS** (`tokio-rustls`) fallback transport layer to bypass strict corporate firewalls and aggressive UDP-blocking NAT environments.
 * **Serialization:** Ultra-compact, zero-copy binary framing protocol using `postcard` for low-overhead Rust-to-Rust IPC and network payload serialization.
 * **Blind Relay Architecture:** The server operates as an untrusted, stateless relay. It holds no databases, tracks zero logs, and transiently forwards binary QUIC packets by public key routing. Un-routable messages remain in volatile RAM with a short TTL before absolute eviction.
 * **Traffic Obfuscation:** Active padding to fixed-size binary frames and dummy traffic generation (Poisson distribution) to mitigate Deep Packet Inspection (DPI) and metadata/size analysis.
 
 ### 3. Local Storage Architecture
+
 * **Embedded Storage:** Zero-dependency embedded KV store (`redb`) operating with ACID guarantees and zero-copy read paths.
 * **Data-At-Rest Protection:** All local database pages are encrypted via **ChaCha20-Poly1305**. Key derivation utilizes **Argon2id** with high memory cost parameters derived from user master authentication.
 * **Local Search Engine:** Embedded full-text search index (`tantivy`) operating over encrypted local stores for sub-millisecond query performance without unencrypting entire message histories to RAM.
@@ -35,7 +38,7 @@
 ## Tech Stack
 
 | Layer | Technology | Key Characteristics |
-| :--- | :--- | :--- |
+| --- | --- | --- |
 | **Frontend UI** | Preact + TypeScript + Vite | ~4KB core footprint, signal-based reactivity, strict typings |
 | **GUI Framework** | Tauri v2 | OS-native WebView wrapper, sandboxed IPC, low RAM overhead (~20-30MB) |
 | **Core Engine** | Rust (2021 Edition) | Memory safety without Garbage Collection, explicit zero-allocation targets |
@@ -62,7 +65,7 @@
 
 * [x] Implement binary framing (`postcard`) and serde layer in `crates/protocol`.
 * [ ] Implement QUIC client transport (`quinn`) with automated TCP/TLS fallback (`tokio-rustls`).
-* [ ] Implement hybrid X25519 + ML-KEM-768 post-quantum handshake (`crates/crypto` / `crates/protocol`).
+* [x] Implement hybrid X25519 + ML-KEM-768 post-quantum handshake (`crates/crypto` / `crates/protocol`).
 * [ ] Build Double Ratchet session state machine for 1-on-1 sessions.
 * [ ] Implement stateless relay routing layer with ephemeral token validation in `apps/relay`.
 * [ ] Design adaptive padding and timing jitter algorithms to obfuscate traffic size/metadata against DPI analysis.
@@ -118,6 +121,42 @@
 
 ---
 
+### Phase 8: Architecture Hardening & I/O Isolation (Planned)
+
+* [ ] **Sans-I/O Architecture Refactoring:** Decouple protocol framing, state machines, and cryptographic verification from direct operating system I/O (sockets and filesystem). Implement pure state-transition functions taking byte slices (`&[u8]`) to enable deterministic mock testing without network or disk overhead.
+* [ ] **Zero-Copy Serialization Audit:** Optimize all payload parsing paths using `zerocopy` / `postcard` traits, eliminating intermediate heap allocations and runtime memory fragmentation during QUIC packet processing.
+* [ ] **Deterministic Fuzz Testing:** Implement structured fuzzing targets using `cargo-fuzz` for wire protocols, frame bounds checking, and state-machine transitions under malformed inputs.
+* [ ] **Encrypted Storage Migration Tools:** Build automated database schema migration pipelines with backward-compatible key derivation upgrades inside `redb`.
+
+---
+
+## Testing & Quality Assurance
+
+`marrow` features a comprehensive automated test suite across all workspace crates, verifying core cryptography, binary framing, network protocols, and ACID storage persistence, alongside strict static analysis and code formatting rules.
+
+### Code Quality & Linting
+
+Before submitting changes, ensure your code passes all formatting and linter checks:
+
+```bash
+# Check code formatting across the entire workspace
+cargo fmt --all -- --check
+
+# Run clippy static analysis and lints
+cargo clippy --workspace -- -D warnings
+
+```
+
+### Running Tests
+
+Execute the full workspace test suite:
+
+```bash
+cargo test --workspace
+
+```
+---
+
 ## Building Locally
 
 ### Prerequisites
@@ -129,11 +168,12 @@
 ### Quick Start
 
 1. Install frontend dependencies:
-   ```bash
-   cd apps/marrow
-   pnpm install
+```bash
+cd apps/marrow
+pnpm install
 
 ```
+
 
 2. Run application in dev mode:
 ```bash
@@ -154,4 +194,4 @@ pnpm tauri build
 
 ## License
 
-Licensed under [GPLv3](https://www.google.com/search?q=LICENSE)
+Licensed under [GPLv3](https://www.google.com/search?q=LICENSE).
