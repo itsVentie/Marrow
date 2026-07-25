@@ -73,8 +73,8 @@ impl StorageEngine {
         let table = read_txn.open_table(VAULT_TABLE)?;
         let value = table.get("identity")?.ok_or(StorageError::NotFound)?;
 
-        let vault: EncryptedVault = bincode::deserialize(value.value())
-            .map_err(|_| StorageError::SerializationError)?;
+        let vault: EncryptedVault =
+            bincode::deserialize(value.value()).map_err(|_| StorageError::SerializationError)?;
 
         Ok(vault)
     }
@@ -95,8 +95,8 @@ impl StorageEngine {
         let table = read_txn.open_table(CONTACTS_TABLE)?;
         let value = table.get(pubkey_hex)?.ok_or(StorageError::NotFound)?;
 
-        let contact: Contact = bincode::deserialize(value.value())
-            .map_err(|_| StorageError::SerializationError)?;
+        let contact: Contact =
+            bincode::deserialize(value.value()).map_err(|_| StorageError::SerializationError)?;
 
         Ok(contact)
     }

@@ -53,8 +53,8 @@ pub enum Frame {
 
 impl Frame {
     pub fn encode(&self) -> Result<Vec<u8>, ProtocolError> {
-        let bytes = bincode::serialize(self)
-            .map_err(|e| ProtocolError::Serialization(e.to_string()))?;
+        let bytes =
+            bincode::serialize(self).map_err(|e| ProtocolError::Serialization(e.to_string()))?;
 
         if bytes.len() > MAX_FRAME_SIZE {
             return Err(ProtocolError::FrameTooLarge(bytes.len()));
@@ -68,8 +68,7 @@ impl Frame {
             return Err(ProtocolError::FrameTooLarge(bytes.len()));
         }
 
-        bincode::deserialize(bytes)
-            .map_err(|e| ProtocolError::Deserialization(e.to_string()))
+        bincode::deserialize(bytes).map_err(|e| ProtocolError::Deserialization(e.to_string()))
     }
 }
 

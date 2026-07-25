@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+pub mod handshake;
+
 #[derive(Error, Debug)]
 pub enum CryptoError {
     #[error("Failed to generate keypair")]
@@ -72,7 +74,8 @@ impl Identity {
         OsRng.fill_bytes(&mut nonce_bytes);
 
         let mut derived_key = [0u8; 32];
-        let params = Params::new(65536, 3, 1, Some(32)).map_err(|_| CryptoError::DerivationError)?;
+        let params =
+            Params::new(65536, 3, 1, Some(32)).map_err(|_| CryptoError::DerivationError)?;
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 
         argon2
@@ -96,12 +99,10 @@ impl Identity {
         })
     }
 
-    pub fn import_encrypted(
-        vault: &EncryptedVault,
-        password: &[u8],
-    ) -> Result<Self, CryptoError> {
+    pub fn import_encrypted(vault: &EncryptedVault, password: &[u8]) -> Result<Self, CryptoError> {
         let mut derived_key = [0u8; 32];
-        let params = Params::new(65536, 3, 1, Some(32)).map_err(|_| CryptoError::DerivationError)?;
+        let params =
+            Params::new(65536, 3, 1, Some(32)).map_err(|_| CryptoError::DerivationError)?;
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 
         argon2
