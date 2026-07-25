@@ -1,4 +1,5 @@
-use bincode;
+#![allow(clippy::result_large_err)]
+
 use r_crypto::EncryptedVault;
 use redb::{Database, ReadableTable, TableDefinition};
 use serde::{Deserialize, Serialize};

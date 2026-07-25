@@ -1,5 +1,4 @@
-// r-protocol
-use bincode;
+use r_crypto::handshake::{InitiatorOutput, ResponderOutput};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -24,11 +23,31 @@ pub struct HandshakeInitPayload {
     pub ml_kem_pk: Vec<u8>,
 }
 
+impl HandshakeInitPayload {
+    pub fn new(sender_pubkey: [u8; 32], init_output: InitiatorOutput) -> Self {
+        Self {
+            sender_pubkey,
+            ephemeral_x25519: init_output.x25519_public,
+            ml_kem_pk: init_output.ml_kem_public,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct HandshakeResponsePayload {
     pub recipient_pubkey: [u8; 32],
     pub ephemeral_x25519: [u8; 32],
     pub ml_kem_ct: Vec<u8>,
+}
+
+impl HandshakeResponsePayload {
+    pub fn new(recipient_pubkey: [u8; 32], resp_output: &ResponderOutput) -> Self {
+        Self {
+            recipient_pubkey,
+            ephemeral_x25519: resp_output.x25519_public,
+            ml_kem_ct: resp_output.ml_kem_ciphertext.clone(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -75,6 +94,7 @@ impl Frame {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use r_crypto::handshake::{HandshakeInitiator, HandshakeResponder};
 
     #[test]
     fn test_ping_pong_frame() {
@@ -117,5 +137,51 @@ mod tests {
         let result = frame.encode();
 
         assert!(matches!(result, Err(ProtocolError::FrameTooLarge(_))));
+    }
+
+    #[test]
+    fn test_end_to_end_handshake_via_frames() {
+        let sender_identity = [0x01; 32];
+        let responder_identity = [0x02; 32];
+
+        let initiator = HandshakeInitiator::new();
+        let init_out = initiator.generate_init_payload();
+
+        let init_frame = Frame::HandshakeInit(HandshakeInitPayload::new(sender_identity, init_out));
+        let init_bytes = init_frame.encode().expect("Failed to encode init frame");
+
+        let decoded_init_frame = Frame::decode(&init_bytes).expect("Failed to decode init frame");
+
+        let (resp_out, responder_secret) = match decoded_init_frame {
+            Frame::HandshakeInit(payload) => {
+                let resp_out = HandshakeResponder::process_init_and_respond(
+                    &payload.ephemeral_x25519,
+                    &payload.ml_kem_pk,
+                )
+                .expect("Failed to process init at responder");
+
+                let secret = resp_out.master_secret.0;
+                (resp_out, secret)
+            }
+            _ => panic!("Expected HandshakeInit frame"),
+        };
+
+        let resp_frame = Frame::HandshakeResponse(HandshakeResponsePayload::new(
+            responder_identity,
+            &resp_out,
+        ));
+        let resp_bytes = resp_frame.encode().expect("Failed to encode resp frame");
+
+        let decoded_resp_frame = Frame::decode(&resp_bytes).expect("Failed to decode resp frame");
+
+        let initiator_secret = match decoded_resp_frame {
+            Frame::HandshakeResponse(payload) => initiator
+                .process_response(&payload.ephemeral_x25519, &payload.ml_kem_ct)
+                .expect("Failed to process response at initiator")
+                .0,
+            _ => panic!("Expected HandshakeResponse frame"),
+        };
+
+        assert_eq!(initiator_secret, responder_secret);
     }
 }
