@@ -1,0 +1,13 @@
+{
+  "Disable": false,
+  "Verbose": false,
+  "IgnoredFiles": [
+    "node_modules",
+    "target",
+    "dist",
+    ".git",
+    "pnpm-lock.yaml",
+    "Cargo.lock",
+    "gen/schemas"
+  ]
+}
