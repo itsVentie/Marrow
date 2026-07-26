@@ -474,13 +474,13 @@ mod tests {
     fn test_messages_isolated_by_session() {
         let (_f, engine) = open_tmp();
 
-        let s1 = engine.create_session("alice", 0).unwrap();
-        let s2 = engine.create_session("bob", 0).unwrap();
+        let s1 = engine.create_session("ventie", 0).unwrap();
+        let s2 = engine.create_session("anek", 0).unwrap();
 
         engine
             .store_message(&StoredMessage {
                 session_id: s1.id.clone(),
-                sender_pubkey_hex: "alice".to_string(),
+                sender_pubkey_hex: "ventie".to_string(),
                 ciphertext: vec![1u8; 4],
                 timestamp: 0,
                 direction: MessageDirection::Outbound,
@@ -491,7 +491,7 @@ mod tests {
         engine
             .store_message(&StoredMessage {
                 session_id: s2.id.clone(),
-                sender_pubkey_hex: "bob".to_string(),
+                sender_pubkey_hex: "anek".to_string(),
                 ciphertext: vec![2u8; 4],
                 timestamp: 0,
                 direction: MessageDirection::Inbound,

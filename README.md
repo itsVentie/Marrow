@@ -64,7 +64,7 @@
 ### Phase 2: Transport & Protocol Layer
 
 * [x] Implement binary framing (`postcard`) and serde layer in `crates/protocol`.
-* [ ] Implement QUIC client transport (`quinn`) with automated TCP/TLS fallback (`tokio-rustls`).
+* [x] Implement QUIC client transport (`quinn`) with automated TCP/TLS fallback (`tokio-rustls`).
 * [x] Implement hybrid X25519 + ML-KEM-768 post-quantum handshake (`crates/crypto` / `crates/protocol`).
 * [ ] Build Double Ratchet session state machine for 1-on-1 sessions.
 * [ ] Implement stateless relay routing layer with ephemeral token validation in `apps/relay`.
