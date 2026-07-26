@@ -4,3 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+tokio.workspace = true
+quinn.workspace = true
+r-protocol = { path = "../../crates/protocol" }
+dashmap = "6"
+rcgen = "0.13"
+rustls = { version = "0.23", features = ["ring"] }
+rustls-pki-types = "1"
+anyhow = "1"
+bytes = "1"
+hex.workspace = true
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
