@@ -7,9 +7,10 @@ use anyhow::Context;
 use bytes::BytesMut;
 use dashmap::DashMap;
 use quinn::{Connection, Endpoint, ServerConfig};
+use rand::Rng;
 use tokio::sync::mpsc;
 
-use r_protocol::{Frame, HandshakeInitPayload, HandshakeResponsePayload, EncryptedMessagePayload};
+use r_protocol::{EncryptedMessagePayload, Frame, HandshakeInitPayload, HandshakeResponsePayload};
 
 type PeerId = [u8; 32];
 type PeerMap = Arc<DashMap<PeerId, mpsc::Sender<Frame>>>;
@@ -25,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
 
     let peer_map: PeerMap = Arc::new(DashMap::new());
     let offline_buffer: OfflineBuffer = Arc::new(DashMap::new());
-    
+
     let server_config = make_server_config().context("Failed to build TLS config")?;
     let addr: SocketAddr = RELAY_ADDR.parse()?;
     let endpoint = Endpoint::server(server_config, addr)?;
@@ -47,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
     while let Some(incoming) = endpoint.accept().await {
         let peer_map = Arc::clone(&peer_map);
         let offline_buffer = Arc::clone(&offline_buffer);
-        
+
         tokio::spawn(async move {
             match incoming.await {
                 Ok(conn) => {
@@ -86,7 +87,11 @@ async fn handle_connection(
     tracing::info!("Peer registered: {}", hex::encode(peer_id));
 
     if let Some((_, queue)) = offline_buffer.remove(&peer_id) {
-        tracing::info!("Delivering {} buffered messages to {}", queue.len(), hex::encode(peer_id));
+        tracing::info!(
+            "Delivering {} buffered messages to {}",
+            queue.len(),
+            hex::encode(peer_id)
+        );
         for (_, frame) in queue {
             let _ = tx.send(frame).await;
         }
@@ -94,8 +99,12 @@ async fn handle_connection(
 
     let write_task = tokio::spawn(async move {
         while let Some(frame) = rx.recv().await {
-            let bytes = frame.encode()?;
+            let bytes = frame.encode_padded()?;
             let len = bytes.len() as u32;
+
+            let jitter_ms = rand::thread_rng().gen_range(2..=15);
+            tokio::time::sleep(Duration::from_millis(jitter_ms)).await;
+
             send_stream.write_all(&len.to_le_bytes()).await?;
             send_stream.write_all(&bytes).await?;
         }
@@ -132,6 +141,7 @@ async fn read_loop(
         };
 
         match &frame {
+            Frame::Dummy(_) => {}
             Frame::Ping => {
                 let _ = self_tx.send(Frame::Pong).await;
             }
@@ -153,7 +163,10 @@ async fn read_loop(
 }
 
 fn buffer_offline_message(offline_buffer: &OfflineBuffer, recipient: PeerId, frame: Frame) {
-    tracing::debug!("Buffering offline frame for peer {}", hex::encode(recipient));
+    tracing::debug!(
+        "Buffering offline frame for peer {}",
+        hex::encode(recipient)
+    );
     let mut entry = offline_buffer.entry(recipient).or_insert_with(VecDeque::new);
     if entry.len() >= 100 {
         entry.pop_front();
@@ -164,8 +177,12 @@ fn buffer_offline_message(offline_buffer: &OfflineBuffer, recipient: PeerId, fra
 fn extract_recipient(frame: &Frame) -> Option<PeerId> {
     match frame {
         Frame::HandshakeInit(HandshakeInitPayload { sender_pubkey, .. }) => Some(*sender_pubkey),
-        Frame::HandshakeResponse(HandshakeResponsePayload { recipient_pubkey, .. }) => Some(*recipient_pubkey),
-        Frame::Message(EncryptedMessagePayload { recipient_pubkey, .. }) => Some(*recipient_pubkey),
+        Frame::HandshakeResponse(HandshakeResponsePayload {
+            recipient_pubkey, ..
+        }) => Some(*recipient_pubkey),
+        Frame::Message(EncryptedMessagePayload {
+            recipient_pubkey, ..
+        }) => Some(*recipient_pubkey),
         _ => None,
     }
 }

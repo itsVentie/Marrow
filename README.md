@@ -68,7 +68,7 @@
 * [x] Implement hybrid X25519 + ML-KEM-768 post-quantum handshake (`crates/crypto` / `crates/protocol`).
 * [x] Build Double Ratchet session state machine for 1-on-1 sessions.
 * [x] Implement stateless relay routing layer with ephemeral token validation in `apps/relay`.
-* [ ] Design adaptive padding and timing jitter algorithms to obfuscate traffic size/metadata against DPI analysis.
+* [x] Design adaptive padding and timing jitter algorithms to obfuscate traffic size/metadata against DPI analysis.
 
 ---
 
