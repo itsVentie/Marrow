@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub const MAX_FRAME_SIZE: usize = 65536;
+pub const PADDING_BLOCK_SIZE: usize = 256;
 
 #[derive(Error, Debug)]
 pub enum ProtocolError {
@@ -68,6 +69,7 @@ pub enum Frame {
     Ack { message_id: [u8; 16] },
     Ping,
     Pong,
+    Dummy(Vec<u8>),
 }
 
 impl Frame {
@@ -89,6 +91,24 @@ impl Frame {
 
         bincode::deserialize(bytes).map_err(|e| ProtocolError::Deserialization(e.to_string()))
     }
+
+    pub fn encode_padded(&self) -> Result<Vec<u8>, ProtocolError> {
+        let mut encoded = self.encode()?;
+        let current_len = encoded.len();
+        
+        let target_len = ((current_len + PADDING_BLOCK_SIZE - 1) / PADDING_BLOCK_SIZE) * PADDING_BLOCK_SIZE;
+        let padding_needed = target_len - current_len;
+
+        if padding_needed > 0 {
+            encoded.resize(target_len, 0);
+        }
+
+        if encoded.len() > MAX_FRAME_SIZE {
+            return Err(ProtocolError::FrameTooLarge(encoded.len()));
+        }
+
+        Ok(encoded)
+    }
 }
 
 #[cfg(test)]
@@ -101,6 +121,25 @@ mod tests {
         let frame = Frame::Ping;
         let encoded = frame.encode().unwrap();
         let decoded = Frame::decode(&encoded).unwrap();
+        assert_eq!(frame, decoded);
+    }
+
+    #[test]
+    fn test_dummy_frame() {
+        let frame = Frame::Dummy(vec![0xAA; 128]);
+        let encoded = frame.encode().unwrap();
+        let decoded = Frame::decode(&encoded).unwrap();
+        assert_eq!(frame, decoded);
+    }
+
+    #[test]
+    fn test_padded_encoding() {
+        let frame = Frame::Ping;
+        let padded_bytes = frame.encode_padded().unwrap();
+        
+        assert_eq!(padded_bytes.len() % PADDING_BLOCK_SIZE, 0);
+        
+        let decoded = Frame::decode(&padded_bytes).unwrap();
         assert_eq!(frame, decoded);
     }
 
