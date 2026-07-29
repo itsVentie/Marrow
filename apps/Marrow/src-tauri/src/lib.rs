@@ -36,10 +36,7 @@ struct DecryptedMessageDto {
 }
 
 #[tauri::command]
-fn init_storage(
-    app_handle: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+fn init_storage(app_handle: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     let mut storage_guard = state.storage.lock().map_err(map_err_str)?;
     if storage_guard.is_some() {
         return Ok(());
@@ -130,8 +127,7 @@ fn unlock_identity_from_file(
     let bytes = fs::read(&file_path).map_err(map_err_str)?;
     let vault = bincode::deserialize(&bytes).map_err(map_err_str)?;
 
-    let identity = Identity::import_encrypted(&vault, password.as_bytes())
-        .map_err(map_err_str)?;
+    let identity = Identity::import_encrypted(&vault, password.as_bytes()).map_err(map_err_str)?;
 
     let pubkey_hex = identity.public_hex();
 
@@ -174,13 +170,11 @@ fn import_identity_file(
 }
 
 #[tauri::command]
-fn get_current_identity(
-    state: State<'_, AppState>,
-) -> Result<Option<PublicIdentityDto>, String> {
+fn get_current_identity(state: State<'_, AppState>) -> Result<Option<PublicIdentityDto>, String> {
     let identity_guard = state.identity.lock().map_err(map_err_str)?;
-    Ok(identity_guard
-        .as_ref()
-        .map(|id| PublicIdentityDto { pubkey_hex: id.public_hex() }))
+    Ok(identity_guard.as_ref().map(|id| PublicIdentityDto {
+        pubkey_hex: id.public_hex(),
+    }))
 }
 
 #[tauri::command]
@@ -223,10 +217,7 @@ fn list_contacts(state: State<'_, AppState>) -> Result<Vec<Contact>, String> {
 }
 
 #[tauri::command]
-fn delete_contact(
-    pubkey_hex: String,
-    state: State<'_, AppState>,
-) -> Result<bool, String> {
+fn delete_contact(pubkey_hex: String, state: State<'_, AppState>) -> Result<bool, String> {
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
@@ -234,10 +225,7 @@ fn delete_contact(
 }
 
 #[tauri::command]
-fn create_session(
-    peer_pubkey_hex: String,
-    state: State<'_, AppState>,
-) -> Result<Session, String> {
+fn create_session(peer_pubkey_hex: String, state: State<'_, AppState>) -> Result<Session, String> {
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
@@ -260,14 +248,13 @@ fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, String> {
 }
 
 #[tauri::command]
-fn delete_session(
-    session_id: String,
-    state: State<'_, AppState>,
-) -> Result<bool, String> {
+fn delete_session(session_id: String, state: State<'_, AppState>) -> Result<bool, String> {
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
-    storage.delete_messages_for_session(&session_id).map_err(map_err_str)?;
+    storage
+        .delete_messages_for_session(&session_id)
+        .map_err(map_err_str)?;
     storage.delete_session(&session_id).map_err(map_err_str)
 }
 

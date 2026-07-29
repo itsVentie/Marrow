@@ -69,10 +69,8 @@ async fn handle_connection(
     peer_map: PeerMap,
     offline_buffer: OfflineBuffer,
 ) -> anyhow::Result<()> {
-    let (mut send_stream, mut recv_stream) = conn
-        .accept_bi()
-        .await
-        .context("Failed to accept stream")?;
+    let (mut send_stream, mut recv_stream) =
+        conn.accept_bi().await.context("Failed to accept stream")?;
 
     let reg_frame_bytes = read_frame_bytes(&mut recv_stream).await?;
     let reg_frame = Frame::decode(&reg_frame_bytes)?;

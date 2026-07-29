@@ -97,7 +97,11 @@ impl DoubleRatchet {
         }
     }
 
-    pub fn encrypt(&mut self, plaintext: &[u8], ad: &[u8]) -> Result<EncryptedMessage, RatchetError> {
+    pub fn encrypt(
+        &mut self,
+        plaintext: &[u8],
+        ad: &[u8],
+    ) -> Result<EncryptedMessage, RatchetError> {
         let cks = self.cks.as_mut().ok_or(RatchetError::DecryptionFailed)?;
         let (next_cks, mk) = kdf_ck(cks);
         *cks = next_cks;
@@ -161,7 +165,11 @@ impl DoubleRatchet {
         Ok(())
     }
 
-    fn skip_message_keys(&mut self, remote_dh_pub: PublicKey, until_n: u32) -> Result<(), RatchetError> {
+    fn skip_message_keys(
+        &mut self,
+        remote_dh_pub: PublicKey,
+        until_n: u32,
+    ) -> Result<(), RatchetError> {
         if self.dhr.as_ref() != Some(&remote_dh_pub) {
             return Ok(());
         }
@@ -237,7 +245,8 @@ fn aead_encrypt(
     ad: &[u8],
     sequence_number: u32,
 ) -> Result<Vec<u8>, RatchetError> {
-    let cipher = ChaCha20Poly1305::new_from_slice(&key.0).map_err(|_| RatchetError::DecryptionFailed)?;
+    let cipher =
+        ChaCha20Poly1305::new_from_slice(&key.0).map_err(|_| RatchetError::DecryptionFailed)?;
 
     let mut nonce_bytes = [0u8; 12];
     nonce_bytes[8..12].copy_from_slice(&sequence_number.to_le_bytes());
@@ -248,7 +257,9 @@ fn aead_encrypt(
         aad: ad,
     };
 
-    cipher.encrypt(nonce, payload).map_err(|_| RatchetError::DecryptionFailed)
+    cipher
+        .encrypt(nonce, payload)
+        .map_err(|_| RatchetError::DecryptionFailed)
 }
 
 fn aead_decrypt(
@@ -257,7 +268,8 @@ fn aead_decrypt(
     ad: &[u8],
     sequence_number: u32,
 ) -> Result<Vec<u8>, RatchetError> {
-    let cipher = ChaCha20Poly1305::new_from_slice(&key.0).map_err(|_| RatchetError::DecryptionFailed)?;
+    let cipher =
+        ChaCha20Poly1305::new_from_slice(&key.0).map_err(|_| RatchetError::DecryptionFailed)?;
 
     let mut nonce_bytes = [0u8; 12];
     nonce_bytes[8..12].copy_from_slice(&sequence_number.to_le_bytes());
@@ -268,7 +280,9 @@ fn aead_decrypt(
         aad: ad,
     };
 
-    cipher.decrypt(nonce, payload).map_err(|_| RatchetError::DecryptionFailed)
+    cipher
+        .decrypt(nonce, payload)
+        .map_err(|_| RatchetError::DecryptionFailed)
 }
 
 #[cfg(test)]

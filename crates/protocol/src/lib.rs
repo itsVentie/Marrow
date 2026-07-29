@@ -95,7 +95,7 @@ impl Frame {
     pub fn encode_padded(&self) -> Result<Vec<u8>, ProtocolError> {
         let mut encoded = self.encode()?;
         let current_len = encoded.len();
-        
+
         let target_len = current_len.div_ceil(PADDING_BLOCK_SIZE) * PADDING_BLOCK_SIZE;
         let padding_needed = target_len - current_len;
 
@@ -136,9 +136,9 @@ mod tests {
     fn test_padded_encoding() {
         let frame = Frame::Ping;
         let padded_bytes = frame.encode_padded().unwrap();
-        
+
         assert_eq!(padded_bytes.len() % PADDING_BLOCK_SIZE, 0);
-        
+
         let decoded = Frame::decode(&padded_bytes).unwrap();
         assert_eq!(frame, decoded);
     }
@@ -205,19 +205,19 @@ mod tests {
             _ => panic!("Expected HandshakeInit frame"),
         };
 
-        let resp_frame = Frame::HandshakeResponse(HandshakeResponsePayload::new(
-            responder_identity,
-            &resp_out,
-        ));
+        let resp_frame =
+            Frame::HandshakeResponse(HandshakeResponsePayload::new(responder_identity, &resp_out));
         let resp_bytes = resp_frame.encode().expect("Failed to encode resp frame");
 
         let decoded_resp_frame = Frame::decode(&resp_bytes).expect("Failed to decode resp frame");
 
         let initiator_secret = match decoded_resp_frame {
-            Frame::HandshakeResponse(payload) => initiator
-                .process_response(&payload.ephemeral_x25519, &payload.ml_kem_ct)
-                .expect("Failed to process response at initiator")
-                .0,
+            Frame::HandshakeResponse(payload) => {
+                initiator
+                    .process_response(&payload.ephemeral_x25519, &payload.ml_kem_ct)
+                    .expect("Failed to process response at initiator")
+                    .0
+            }
             _ => panic!("Expected HandshakeResponse frame"),
         };
 

@@ -1,0 +1,27 @@
+#!/bin/sh
+
+echo "Ì¥ç Running pre-commit safety checks..."
+
+echo "Ì∂Ä Checking Rust formatting..."
+cargo fmt --all -- --check
+if [ $? -ne 0 ]; then
+    echo "‚ùå cargo fmt failed! Run 'cargo fmt --all' to fix formatting."
+    exit 1
+fi
+
+echo "Ì≥é Running Clippy..."
+cargo clippy --workspace -- -D warnings
+if [ $? -ne 0 ]; then
+    echo "‚ùå Clippy found errors! Fix warnings before committing."
+    exit 1
+fi
+
+echo "Ì∑™ Running Cargo tests..."
+cargo test --workspace
+if [ $? -ne 0 ]; then
+    echo "‚ùå Tests failed! Fix falling tests before committing."
+    exit 1
+fi
+
+echo "‚úÖ All checks passed successfully!"
+exit 0

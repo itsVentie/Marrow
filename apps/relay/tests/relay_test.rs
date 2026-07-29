@@ -32,7 +32,9 @@ async fn test_padded_frame_encoding_and_decoding() {
     };
 
     let frame = Frame::Message(msg_payload);
-    let padded_bytes = frame.encode_padded().expect("Failed to encode padded frame");
+    let padded_bytes = frame
+        .encode_padded()
+        .expect("Failed to encode padded frame");
 
     assert_eq!(padded_bytes.len() % PADDING_BLOCK_SIZE, 0);
 

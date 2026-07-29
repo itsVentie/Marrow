@@ -1,8 +1,8 @@
 #![allow(clippy::result_large_err)]
 
 use r_crypto::EncryptedVault;
-use rand::RngCore;
 use rand::rngs::OsRng;
+use rand::RngCore;
 use redb::{Database, ReadableTable, TableDefinition};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -385,7 +385,9 @@ mod tests {
         let loaded = engine.get_session(&session.id).unwrap();
         assert_eq!(loaded, session);
 
-        engine.update_session_activity(&session.id, 2_000_000).unwrap();
+        engine
+            .update_session_activity(&session.id, 2_000_000)
+            .unwrap();
         let updated = engine.get_session(&session.id).unwrap();
         assert_eq!(updated.last_activity, 2_000_000);
 
