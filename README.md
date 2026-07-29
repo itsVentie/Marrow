@@ -79,7 +79,7 @@
 * [ ] Implement background daemon/tray process for persistent network listening without UI overhead.
 * [ ] Integrate `tantivy` for instant local encrypted message search.
 * [x] Implement secure local storage for contact lists and conversation histories.
-* [/] Build key exporting/importing mechanisms with physical key backup features (BIP-39 mnemonic phrase).
+* [ ] Build key exporting/importing mechanisms with physical key backup features (BIP-39 mnemonic phrase).
 * [x] Build UI state logic for direct messaging, active contacts, and peer connection statuses.
 
 ---
