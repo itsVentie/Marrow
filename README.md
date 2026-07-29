@@ -134,6 +134,15 @@
 
 `marrow` features a comprehensive automated test suite across all workspace crates, verifying core cryptography, binary framing, network protocols, and ACID storage persistence, alongside strict static analysis and code formatting rules.
 
+### Local Git Hooks Setup
+
+To automatically run pre-commit checks (`cargo fmt`, `cargo clippy`, and `cargo test`) before every commit, enable the repository's versioned hooks:
+
+```bash
+git config core.hooksPath .githooks
+
+```
+
 ### Code Quality & Linting
 
 Before submitting changes, ensure your code passes all formatting and linter checks:
@@ -192,7 +201,13 @@ pnpm tauri build
 
 ---
 
+## Contributing & Security
+
+* For development guidelines, branch strategies, and PR expectations, read [CONTRIBUTING.md](https://www.google.com/search?q=./CONTRIBUTING.md).
+* To report a security vulnerability or cryptographic flaw, review our [SECURITY.md](https://www.google.com/search?q=./SECURITY.md).
+
+---
+
 ## License
 
-Licensed under [GPLv3](https://www.google.com/search?q=LICENSE).
-
+Licensed under [GPLv3](https://www.google.com/search?q=./LICENSE).
