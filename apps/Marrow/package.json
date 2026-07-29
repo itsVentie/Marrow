@@ -4,7 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test:workflows": "act",
+    "test:workflows:ci": "act -W .github/workflows/ci.yml",
+    "test:workflows:release": "act create -W .github/workflows/release.yml",
     "check": "cargo clippy --workspace -- -D warnings && cargo test --workspace",
+    "check-all": "actionlint && cargo fmt --all -- --check && cargo clippy --workspace -- -D warnings && cargo test --workspace",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
