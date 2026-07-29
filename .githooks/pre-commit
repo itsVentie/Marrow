@@ -1,22 +1,22 @@
 #!/bin/sh
 
-echo "í´ Running pre-commit safety checks..."
+echo "ï¿½ï¿½ï¿½ Running pre-commit safety checks..."
 
-echo "í¶€ Checking Rust formatting..."
+echo "ï¿½ï¿½ï¿½ Checking Rust formatting..."
 cargo fmt --all -- --check
 if [ $? -ne 0 ]; then
     echo "âŒ cargo fmt failed! Run 'cargo fmt --all' to fix formatting."
     exit 1
 fi
 
-echo "í³ Running Clippy..."
+echo "ï¿½ï¿½ï¿½ Running Clippy..."
 cargo clippy --workspace -- -D warnings
 if [ $? -ne 0 ]; then
     echo "âŒ Clippy found errors! Fix warnings before committing."
     exit 1
 fi
 
-echo "í·ª Running Cargo tests..."
+echo "ï¿½ï¿½ï¿½ Running Cargo tests..."
 cargo test --workspace
 if [ $? -ne 0 ]; then
     echo "âŒ Tests failed! Fix falling tests before committing."

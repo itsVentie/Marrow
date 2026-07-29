@@ -1,0 +1,19 @@
+{
+  "Version": "v3.8.0",
+  "Verbose": false,
+  "Disabled": {
+    "TrimTrailingWhitespace": false,
+    "InsertFinalNewline": false,
+    "IndentSize": false,
+    "IndentStyle": false,
+    "MaxLineLength": false
+  },
+  "Exclude": [
+    "target/",
+    "node_modules/",
+    ".git/",
+    "pnpm-lock.yaml",
+    "Cargo.lock"
+  ],
+  "AllowedExtensions": []
+}
