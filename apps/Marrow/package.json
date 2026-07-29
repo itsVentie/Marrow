@@ -4,20 +4,24 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "check": "cargo clippy --workspace -- -D warnings && cargo test --workspace",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri"
   },
   "dependencies": {
-    "preact": "^10.25.1",
+    "@preact/signals": "^2.10.0",
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2"
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-opener": "^2",
+    "preact": "^10.25.1"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.9.3",
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^26.1.2",
     "typescript": "~5.6.2",
-    "vite": "^6.0.3",
-    "@tauri-apps/cli": "^2"
+    "vite": "^6.0.3"
   }
 }

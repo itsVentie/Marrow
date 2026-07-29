@@ -1,51 +1,56 @@
-import { useState } from "preact/hooks";
-import preactLogo from "./assets/preact.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
+import { api, PublicIdentityDto, Session } from "./api/tauri";
+import { AuthScreen } from "./components/screens/AuthScreen";
+import { DashboardScreen } from "./components/screens/DashboardScreen";
+import { ChatScreen } from "./components/screens/ChatScreen";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+export function App() {
+  const identity = useSignal<PublicIdentityDto | null>(null);
+  const activeSession = useSignal<Session | null>(null);
+  const loading = useSignal(true);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+  useEffect(() => {
+    (async () => {
+      try {
+        await api.initStorage();
+        const current = await api.getCurrentIdentity();
+        if (current) {
+          identity.value = current;
+        }
+      } catch (e) {
+        console.warn("No active vault session:", e);
+      } finally {
+        loading.value = false;
+      }
+    })();
+  }, []);
+
+  if (loading.value) {
+    return (
+      <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", backgroundColor: "#0f172a", color: "#fff" }}>
+        Loading Vault...
+      </div>
+    );
+  }
+
+  if (!identity.value) {
+    return <AuthScreen onAuthenticated={(id) => (identity.value = id)} />;
+  }
+
+  if (activeSession.value) {
+    return (
+      <ChatScreen
+        session={activeSession.value}
+        onBack={() => (activeSession.value = null)}
+      />
+    );
   }
 
   return (
-    <main class="container">
-      <h1>Welcome to Tauri + Preact</h1>
-
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" class="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://preactjs.com" target="_blank">
-          <img src={preactLogo} class="logo preact" alt="Preact logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and Preact logos to learn more.</p>
-
-      <form
-        class="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onInput={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <DashboardScreen
+      identity={identity.value}
+      onSelectSession={(session) => (activeSession.value = session)}
+    />
   );
 }
-
-export default App;

@@ -96,7 +96,7 @@ impl Frame {
         let mut encoded = self.encode()?;
         let current_len = encoded.len();
         
-        let target_len = ((current_len + PADDING_BLOCK_SIZE - 1) / PADDING_BLOCK_SIZE) * PADDING_BLOCK_SIZE;
+        let target_len = current_len.div_ceil(PADDING_BLOCK_SIZE) * PADDING_BLOCK_SIZE;
         let padding_needed = target_len - current_len;
 
         if padding_needed > 0 {

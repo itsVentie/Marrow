@@ -167,7 +167,7 @@ fn buffer_offline_message(offline_buffer: &OfflineBuffer, recipient: PeerId, fra
         "Buffering offline frame for peer {}",
         hex::encode(recipient)
     );
-    let mut entry = offline_buffer.entry(recipient).or_insert_with(VecDeque::new);
+    let mut entry = offline_buffer.entry(recipient).or_default();
     if entry.len() >= 100 {
         entry.pop_front();
     }

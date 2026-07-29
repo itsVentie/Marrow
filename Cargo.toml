@@ -5,7 +5,7 @@ members = [
     "crates/storage",
     "crates/network",
     "crates/protocol",
-    "apps/marrow/src-tauri",
+    "apps/Marrow/src-tauri",
     "apps/relay"
 ]
 
@@ -27,6 +27,11 @@ ml-kem = "0.2"
 hkdf = "0.12"
 sha2 = "0.10"
 rand_core = { version = "0.6", features = ["getrandom"] }
+
+r-crypto = { path = "crates/crypto" }
+r-storage = { path = "crates/storage" }
+r-network = { path = "crates/network" }
+r-protocol = { path = "crates/protocol" }
 
 [profile.dev]
 incremental = false

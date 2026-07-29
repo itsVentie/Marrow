@@ -61,7 +61,7 @@
 
 ---
 
-### Phase 2: Transport & Protocol Layer
+### Phase 2: Transport & Protocol Layer (Completed)
 
 * [x] Implement binary framing (`postcard`) and serde layer in `crates/protocol`.
 * [x] Implement QUIC client transport (`quinn`) with automated TCP/TLS fallback (`tokio-rustls`).
@@ -74,13 +74,13 @@
 
 ### Phase 3: Desktop Client & User Interface
 
-* [ ] Design "Dark Glassmorphism" UI in Preact using CSS Modules / SCSS.
-* [ ] Integrate IPC invocations between Preact and Rust core via `@tauri-apps/api`.
+* [x] Design "Dark Glassmorphism" UI in Preact using CSS Modules / SCSS.
+* [x] Integrate IPC invocations between Preact and Rust core via `@tauri-apps/api`.
 * [ ] Implement background daemon/tray process for persistent network listening without UI overhead.
 * [ ] Integrate `tantivy` for instant local encrypted message search.
-* [ ] Implement secure local storage for contact lists and conversation histories.
-* [ ] Build key exporting/importing mechanisms with physical key backup features (BIP-39 mnemonic phrase).
-* [ ] Build UI state logic for direct messaging, active contacts, and peer connection statuses.
+* [x] Implement secure local storage for contact lists and conversation histories.
+* [/] Build key exporting/importing mechanisms with physical key backup features (BIP-39 mnemonic phrase).
+* [x] Build UI state logic for direct messaging, active contacts, and peer connection statuses.
 
 ---
 
@@ -155,6 +155,7 @@ Execute the full workspace test suite:
 cargo test --workspace
 
 ```
+
 ---
 
 ## Building Locally
@@ -168,30 +169,30 @@ cargo test --workspace
 ### Quick Start
 
 1. Install frontend dependencies:
+
 ```bash
 cd apps/marrow
 pnpm install
 
 ```
 
-
 2. Run application in dev mode:
+
 ```bash
 pnpm tauri dev
 
 ```
 
-
 3. Build production release:
+
 ```bash
 pnpm tauri build
 
 ```
-
-
 
 ---
 
 ## License
 
 Licensed under [GPLv3](https://www.google.com/search?q=LICENSE).
+

@@ -1,0 +1,135 @@
+.container {
+  display: flex;
+  height: 100vh;
+  align-items: center;
+  justify-content: center;
+  background-color: #0f172a;
+  color: #f8fafc;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+}
+
+.card {
+  width: 380px;
+  padding: 2rem;
+  border-radius: 12px;
+  background-color: #1e293b;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.title {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.label {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.input,
+.select {
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background-color: #0f172a;
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input:focus,
+.select:focus {
+  border-color: #3b82f6;
+}
+
+.emptyNotice {
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px dashed #334155;
+  background-color: #0f172a;
+  color: #64748b;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.button {
+  padding: 0.75rem;
+  margin-top: 0.25rem;
+  border-radius: 6px;
+  border: none;
+  background-color: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.button:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.importBtn {
+  margin-top: 0.75rem;
+  padding: 0.6rem;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background-color: transparent;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.importBtn:hover:not(:disabled) {
+  background-color: #0f172a;
+  border-color: #475569;
+}
+
+.toggleBtn {
+  margin-top: 1rem;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  transition: color 0.15s ease;
+}
+
+.toggleBtn:hover {
+  color: #f1f5f9;
+}
+
+.error {
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 1.25rem;
+  border-radius: 6px;
+  background-color: #7f1d1d;
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
