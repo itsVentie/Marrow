@@ -203,11 +203,11 @@ pnpm tauri build
 
 ## Contributing & Security
 
-* For development guidelines, branch strategies, and PR expectations, read [CONTRIBUTING.md](https://www.google.com/search?q=./CONTRIBUTING.md).
-* To report a security vulnerability or cryptographic flaw, review our [SECURITY.md](https://www.google.com/search?q=./SECURITY.md).
+* For development guidelines, branch strategies, and PR expectations, read [CONTRIBUTING.md](https://github.com/itsVentie/Marrow/blob/main/CONTRIBUTING.md).
+* To report a security vulnerability or cryptographic flaw, review our [SECURITY.md](https://github.com/itsVentie/Marrow/blob/main/SECURITY.md).
 
 ---
 
 ## License
 
-Licensed under [GPLv3](https://www.google.com/search?q=./LICENSE).
+Licensed under [GPLv3](https://github.com/itsVentie/Marrow/blob/main/LICENSE).
