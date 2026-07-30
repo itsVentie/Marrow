@@ -74,7 +74,7 @@
 
 ### Phase 3: Desktop Client & User Interface
 
-* [x] Design "Dark Glassmorphism" UI in Preact using CSS Modules / SCSS.
+* [x] Design UI in Preact using CSS Modules.
 * [x] Integrate IPC invocations between Preact and Rust core via `@tauri-apps/api`.
 * [ ] Implement background daemon/tray process for persistent network listening without UI overhead.
 * [ ] Integrate `tantivy` for instant local encrypted message search.
