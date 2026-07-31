@@ -1,5 +1,7 @@
 # Marrow
 
+<img width="100%" height="100%" alt="photo_2026-07-31_13-27-56" src="https://github.com/user-attachments/assets/eef7f428-8e28-4b4c-a4c6-4da80a4d7523" />
+
 > [!WARNING]
 > **This project is under active development.**
 > The current version may contain bugs, incomplete or non-functional features, and breaking changes without prior notice. Use at your own risk.
