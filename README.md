@@ -54,16 +54,18 @@
 
 ## Roadmap
 
-### Phase 1: Core Primitives & Identity (Completed)
+<details>
+<summary><b>Phase 1: Core Primitives & Identity (Completed)</b></summary>
 
 * [x] Cargo Workspace setup and modular crate design.
 * [x] Tauri v2 + Preact + TypeScript frontend pipeline initialization.
 * [x] Implement Ed25519 keypair generation and Argon2id local file encryption in `crates/crypto`.
 * [x] Build encrypted local KV abstraction over `redb` in `crates/storage`.
 
----
+</details>
 
-### Phase 2: Transport & Protocol Layer (Completed)
+<details>
+<summary><b>Phase 2: Transport & Protocol Layer (Completed)</b></summary>
 
 * [x] Implement binary framing (`postcard`) and serde layer in `crates/protocol`.
 * [x] Implement QUIC client transport (`quinn`) with automated TCP/TLS fallback (`tokio-rustls`).
@@ -72,9 +74,10 @@
 * [x] Implement stateless relay routing layer with ephemeral token validation in `apps/relay`.
 * [x] Design adaptive padding and timing jitter algorithms to obfuscate traffic size/metadata against DPI analysis.
 
----
+</details>
 
-### Phase 3: Desktop Client & User Interface
+<details>
+<summary><b>Phase 3: Desktop Client & User Interface</b></summary>
 
 * [x] Design UI in Preact using CSS Modules.
 * [x] Integrate IPC invocations between Preact and Rust core via `@tauri-apps/api`.
@@ -84,27 +87,30 @@
 * [ ] Build key exporting/importing mechanisms with physical key backup features (BIP-39 mnemonic phrase).
 * [x] Build UI state logic for direct messaging, active contacts, and peer connection statuses.
 
----
+</details>
 
-### Phase 4: Secure Group Messaging & Public Channels
+<details>
+<summary><b>Phase 4: Secure Group Messaging & Public Channels</b></summary>
 
 * [ ] Implement TreeKEM / IETF MLS (Messaging Layer Security) protocol for dynamic encrypted group chats (`crates/mls`).
 * [ ] Design Blind Group Relay engine for server-side distribution of group frames without decrypting metadata.
 * [ ] Implement channel architecture (Broadcast channels with asymmetric signed state updates).
 * [ ] Build local group session state persistence with automatic group key rotation on member removal.
 
----
+</details>
 
-### Phase 5: Voice, Video & E2EE Real-Time Transport
+<details>
+<summary><b>Phase 5: Voice, Video & E2EE Real-Time Transport</b></summary>
 
 * [ ] Build native WebRTC / DTLS-SRTP audio engine with custom Post-Quantum key exchange extension (`webrtc-rs`).
 * [ ] Implement Opus audio codec pipeline (`opus-rs`) with adaptive bitrates, noise suppression, and voice activation.
 * [ ] Implement encrypted P2P signaling frame routing over `apps/relay` for NAT traversal (ICE/STUN/TURN).
 * [ ] Build background peer-to-peer audio calling state machine and UI overlay.
 
----
+</details>
 
-### Phase 6: Memory Security, Anonymity & Anti-Analysis
+<details>
+<summary><b>Phase 6: Memory Security, Anonymity & Anti-Analysis</b></summary>
 
 * [ ] Memory pinning via `mlock` / `VirtualLock` to lock critical cryptographic key regions in physical RAM.
 * [ ] Implement Onion Routing layer over relay nodes (Multi-hop routing for full sender/receiver IP masking).
@@ -112,23 +118,45 @@
 * [ ] Complete zeroization audits for sensitive memory regions (using `zeroize` crate across all crates).
 * [ ] Implement Panic Mode (Instant zeroization of in-memory keys and local storage drop via master passphrase).
 
----
+</details>
 
-### Phase 7: Hardening, Auditing & Resilience
+<details>
+<summary><b>Phase 7: Hardening, Auditing & Resilience</b></summary>
 
 * [ ] Automated integration tests for network partitions, packet drops, and state recovery.
 * [ ] Stress testing `apps/relay` throughput and memory footprint under thousands of simultaneous streams.
 * [ ] Static analysis, Miri checks, clippy lint enforcement, and memory safety security audit.
 * [ ] Production release pipelines (Cross-platform builds for Windows, macOS, Linux).
 
----
+</details>
 
-### Phase 8: Architecture Hardening & I/O Isolation (Planned)
+<details>
+<summary><b>Phase 8: Architecture Hardening & I/O Isolation (Planned)</b></summary>
 
 * [ ] **Sans-I/O Architecture Refactoring:** Decouple protocol framing, state machines, and cryptographic verification from direct operating system I/O (sockets and filesystem). Implement pure state-transition functions taking byte slices (`&[u8]`) to enable deterministic mock testing without network or disk overhead.
 * [ ] **Zero-Copy Serialization Audit:** Optimize all payload parsing paths using `zerocopy` / `postcard` traits, eliminating intermediate heap allocations and runtime memory fragmentation during QUIC packet processing.
 * [ ] **Deterministic Fuzz Testing:** Implement structured fuzzing targets using `cargo-fuzz` for wire protocols, frame bounds checking, and state-machine transitions under malformed inputs.
 * [ ] **Encrypted Storage Migration Tools:** Build automated database schema migration pipelines with backward-compatible key derivation upgrades inside `redb`.
+
+</details>
+
+<details>
+<summary><b>Phase 9: Post-Quantum Migration & Crypto Agility</b></summary>
+
+* [ ] **ML-DSA (Dilithium) Signature Integration:** Add support for ML-DSA-65 / ML-DSA-87 digital signatures alongside Ed25519 for identity verification and long-term public keys.
+* [ ] **Crypto Agility Versioning:** Implement dynamic cryptographic suite negotiation in protocol handshake headers to enable seamless algorithm upgrades without breaking backwards compatibility.
+* [ ] **Hardware Security Integration:** Build optional PKCS#11 / FIDO2 YubiKey integration for hardware-backed master key derivation and session approval.
+
+</details>
+
+<details>
+<summary><b>Phase 10: eBPF Telemetry & Autonomous Node Fleet Administration</b></summary>
+
+* [ ] **eBPF-Based Kernel Telemetry:** Deploy lightweight eBPF probes in `apps/relay` nodes for real-time kernel-level packet inspection, drop tracking, and anti-DDoS traffic filtering without context switches.
+* [ ] **Zero-Knowledge Node Monitoring:** Implement anonymized health and performance reporting metrics from relay nodes using blinded aggregation primitives.
+* [ ] **Automated Relay Peer Discovery:** Build a decentralized peer-discovery protocol over distributed hash tables (DHT) with cryptographically verified node descriptors.
+
+</details>
 
 ---
 
