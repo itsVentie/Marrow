@@ -55,6 +55,7 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
+            xdg-utils \
             librsvg2-dev
 
       - name: Install Frontend Dependencies
