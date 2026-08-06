@@ -55,11 +55,12 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
+            xdg-utils \
             librsvg2-dev
 
       - name: Install Frontend Dependencies
         run: |
-          cd apps/marrow
+          cd apps/Marrow
           pnpm install
 
       - name: Build Tauri Application
@@ -67,7 +68,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: './apps/marrow'
+          projectPath: './apps/Marrow'
           tagName: ${{ github.ref_name }}
           releaseName: 'Marrow ${{ github.ref_name }}'
           releaseBody: 'See release commit logs for details.'
