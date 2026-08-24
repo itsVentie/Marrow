@@ -11,7 +11,10 @@ use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 pub mod handshake;
+pub mod mnemonic;
 pub mod ratchet;
+
+pub use mnemonic::MnemonicKey;
 
 #[derive(Error, Debug)]
 pub enum CryptoError {
