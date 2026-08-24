@@ -4,6 +4,9 @@ use r_protocol::Frame;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 
+pub type TxStream = futures::stream::SplitSink<Framed<TcpStream, FrameCodec>, Frame>;
+pub type RxStream = futures::stream::SplitStream<Framed<TcpStream, FrameCodec>>;
+
 pub struct FrameTransport {
     framed: Framed<TcpStream, FrameCodec>,
 }
@@ -23,12 +26,7 @@ impl FrameTransport {
         self.framed.next().await.transpose()
     }
 
-    pub fn into_split(
-        self,
-    ) -> (
-        futures::stream::SplitSink<Framed<TcpStream, FrameCodec>, Frame>,
-        futures::stream::SplitStream<Framed<TcpStream, FrameCodec>>,
-    ) {
+    pub fn into_split(self) -> (TxStream, RxStream) {
         self.framed.split()
     }
 }

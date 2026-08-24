@@ -14,6 +14,7 @@ pub enum NetworkCodecError {
     FrameTooLarge(usize),
 }
 
+#[derive(Default)]
 pub struct FrameCodec;
 
 impl FrameCodec {
