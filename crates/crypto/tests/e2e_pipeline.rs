@@ -4,16 +4,16 @@ use r_protocol::{EncryptedMessagePayload, Frame, HandshakeInitPayload, Handshake
 
 #[test]
 fn test_e2e_handshake_and_frame_pipeline() {
-    let Ventie_identity = Identity::generate();
-    let Anek_identity = Identity::generate();
+    let ventie_identity = Identity::generate();
+    let anek_identity = Identity::generate();
 
-    let Ventie_pubkey = Ventie_identity.verifying_key().to_bytes();
-    let Anek_pubkey = Anek_identity.verifying_key().to_bytes();
+    let ventie_pubkey = ventie_identity.verifying_key().to_bytes();
+    let anek_pubkey = anek_identity.verifying_key().to_bytes();
 
     let initiator = HandshakeInitiator::new();
     let init_out = initiator.generate_init_payload();
 
-    let init_payload = HandshakeInitPayload::new(Ventie_pubkey, init_out);
+    let init_payload = HandshakeInitPayload::new(ventie_pubkey, init_out);
     let init_frame = Frame::HandshakeInit(init_payload);
 
     let encoded_init = init_frame
@@ -37,7 +37,7 @@ fn test_e2e_handshake_and_frame_pipeline() {
         _ => panic!("Expected HandshakeInit frame"),
     };
 
-    let resp_payload = HandshakeResponsePayload::new(Anek_pubkey, &resp_out);
+    let resp_payload = HandshakeResponsePayload::new(anek_pubkey, &resp_out);
     let resp_frame = Frame::HandshakeResponse(resp_payload);
 
     let encoded_resp = resp_frame
@@ -63,7 +63,7 @@ fn test_e2e_handshake_and_frame_pipeline() {
     );
 
     let msg_payload = EncryptedMessagePayload {
-        recipient_pubkey: Anek_pubkey,
+        recipient_pubkey: anek_pubkey,
         dh_pubkey: [0x42; 32],
         sequence_number: 1,
         previous_chain_length: 0,
