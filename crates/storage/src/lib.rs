@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use thiserror::Error;
 
+pub mod search;
+
+pub use search::{SearchError, SearchIndex, SearchResult};
+
 const VAULT_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("system_vault");
 const CONTACTS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("contacts");
 const SESSIONS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("sessions");
