@@ -7,7 +7,6 @@ use tokio_util::codec::{Decoder, Encoder};
 pub enum NetworkCodecError {
     #[error("Protocol error: {0}")]
     Protocol(#[from] ProtocolError),
-
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
