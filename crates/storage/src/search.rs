@@ -1,11 +1,11 @@
+use std::path::Path;
 use tantivy::collector::TopDocs;
 use tantivy::directory::error::OpenDirectoryError;
 use tantivy::directory::MmapDirectory;
 use tantivy::query::QueryParser;
-use tantivy::schema::*;
 use tantivy::schema::OwnedValue;
+use tantivy::schema::*;
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
-use std::path::Path;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
