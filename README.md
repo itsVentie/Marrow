@@ -65,7 +65,7 @@
 </details>
 
 <details>
-<summary><b>Phase 2: Transport & Protocol Layer (Completed)</b></summary>
+<summary><b>Phase 2: Transport & Networking Layer</b></summary>
 
 * [x] Implement binary framing (`postcard`) and serde layer in `crates/protocol`.
 * [x] Implement QUIC client transport (`quinn`) with automated TCP/TLS fallback (`tokio-rustls`).
@@ -73,6 +73,11 @@
 * [x] Build Double Ratchet session state machine for 1-on-1 sessions.
 * [x] Implement stateless relay routing layer with ephemeral token validation in `apps/relay`.
 * [x] Design adaptive padding and timing jitter algorithms to obfuscate traffic size/metadata against DPI analysis.
+* [x] Design custom MarrowCodec and frame length framing over libp2p request-response protocol (`r-network`).
+* [ ] Build composite MarrowBehaviour routing structure (Kademlia DHT, Identify, Ping, AutoNAT).
+* [ ] Implement NetworkNode async event loop for Swarm driver and channel-based IPC interface (`NetworkCommand`/`NetworkEvent`).
+* [ ] Implement libp2p hole punching (STUN/TURN/ICE / Relay v2) for direct peer connections behind NAT.
+* [ ] Connect `r-network` layer to Tauri state runtime and UI event dispatcher.
 
 </details>
 
@@ -81,11 +86,11 @@
 
 * [x] Design UI in Preact using CSS Modules.
 * [x] Integrate IPC invocations between Preact and Rust core via `@tauri-apps/api`.
-* [ ] Implement background daemon/tray process for persistent network listening without UI overhead.
-* [ ] Integrate `tantivy` for instant local encrypted message search.
+* [x] Implement background daemon/tray process for persistent network listening without UI overhead (`tauri` tray-icon + `prevent_close`).
+* [x] Integrate `tantivy` for instant local encrypted message search inside storage runtime.
 * [x] Implement secure local storage for contact lists and conversation histories.
-* [ ] Build key exporting/importing mechanisms with physical key backup features (BIP-39 mnemonic phrase).
 * [x] Build UI state logic for direct messaging, active contacts, and peer connection statuses.
+* [ ] Build key exporting/importing mechanisms with physical key backup features (BIP-39 mnemonic phrase).
 
 </details>
 
@@ -131,7 +136,7 @@
 </details>
 
 <details>
-<summary><b>Phase 8: Architecture Hardening & I/O Isolation (Planned)</b></summary>
+<summary><b>Phase 8: Architecture Hardening & I/O Isolation</b></summary>
 
 * [ ] **Sans-I/O Architecture Refactoring:** Decouple protocol framing, state machines, and cryptographic verification from direct operating system I/O (sockets and filesystem). Implement pure state-transition functions taking byte slices (`&[u8]`) to enable deterministic mock testing without network or disk overhead.
 * [ ] **Zero-Copy Serialization Audit:** Optimize all payload parsing paths using `zerocopy` / `postcard` traits, eliminating intermediate heap allocations and runtime memory fragmentation during QUIC packet processing.
