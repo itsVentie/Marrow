@@ -4,3 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+r-protocol = { workspace = true }
+tokio = { workspace = true, features = ["net", "io-util", "sync"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+bytes = "1.6"
+thiserror = { workspace = true }
+futures = "0.3"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+r-crypto = { workspace = true }

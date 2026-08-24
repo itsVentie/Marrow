@@ -20,3 +20,6 @@ rand_core.workspace = true
 
 [dev-dependencies]
 tempfile = "3.10"
+tokio = { workspace = true, features = ["full"] }
+r-protocol = { workspace = true }
+postcard = "1.0"
