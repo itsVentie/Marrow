@@ -1,69 +1,101 @@
-use bytes::{Buf, BufMut, BytesMut};
-use r_protocol::{Frame, ProtocolError, MAX_FRAME_SIZE};
-use thiserror::Error;
-use tokio_util::codec::{Decoder, Encoder};
+use async_trait::async_trait;
+use futures::prelude::*;
+use libp2p::request_response::Codec;
+use std::io;
 
-#[derive(Error, Debug)]
-pub enum NetworkCodecError {
-    #[error("Protocol error: {0}")]
-    Protocol(#[from] ProtocolError),
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MarrowProtocol;
 
-    #[error("Frame length {0} exceeds maximum allowed limit {MAX_FRAME_SIZE}")]
-    FrameTooLarge(usize),
-}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarrowRequest(pub Vec<u8>);
 
-#[derive(Default)]
-pub struct FrameCodec;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarrowResponse(pub Vec<u8>);
 
-impl FrameCodec {
-    pub fn new() -> Self {
-        Self
+#[derive(Clone, Default)]
+pub struct MarrowCodec;
+
+#[async_trait]
+impl Codec for MarrowCodec {
+    type Protocol = MarrowProtocol;
+    type Request = MarrowRequest;
+    type Response = MarrowResponse;
+
+    async fn read_request<T>(&mut self, _: &MarrowProtocol, io: &mut T) -> io::Result<Self::Request>
+    where
+        T: AsyncRead + Unpin + Send,
+    {
+        let mut len_buf = [0u8; 4];
+        io.read_exact(&mut len_buf).await?;
+        let len = u32::from_be_bytes(len_buf) as usize;
+
+        if len > 10 * 1024 * 1024 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Frame exceeds size limit",
+            ));
+        }
+
+        let mut buf = vec![0u8; len];
+        io.read_exact(&mut buf).await?;
+        Ok(MarrowRequest(buf))
     }
-}
 
-impl Decoder for FrameCodec {
-    type Item = Frame;
-    type Error = NetworkCodecError;
+    async fn read_response<T>(&mut self, _: &MarrowProtocol, io: &mut T) -> io::Result<Self::Response>
+    where
+        T: AsyncRead + Unpin + Send,
+    {
+        let mut len_buf = [0u8; 4];
+        io.read_exact(&mut len_buf).await?;
+        let len = u32::from_be_bytes(len_buf) as usize;
 
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if src.len() < 4 {
-            return Ok(None);
+        if len > 10 * 1024 * 1024 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Frame exceeds size limit",
+            ));
         }
 
-        let mut length_bytes = [0u8; 4];
-        length_bytes.copy_from_slice(&src[..4]);
-        let frame_len = u32::from_be_bytes(length_bytes) as usize;
-
-        if frame_len > MAX_FRAME_SIZE {
-            return Err(NetworkCodecError::FrameTooLarge(frame_len));
-        }
-
-        if src.len() < 4 + frame_len {
-            src.reserve((4 + frame_len) - src.len());
-            return Ok(None);
-        }
-
-        src.advance(4);
-        let frame_bytes = src.split_to(frame_len);
-        let frame = Frame::decode(&frame_bytes)?;
-
-        Ok(Some(frame))
+        let mut buf = vec![0u8; len];
+        io.read_exact(&mut buf).await?;
+        Ok(MarrowResponse(buf))
     }
-}
 
-impl Encoder<Frame> for FrameCodec {
-    type Error = NetworkCodecError;
-
-    fn encode(&mut self, item: Frame, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let encoded = item.encode_padded()?;
-        let len = encoded.len() as u32;
-
-        dst.reserve(4 + encoded.len());
-        dst.put_u32(len);
-        dst.put_slice(&encoded);
-
+    async fn write_request<T>(
+        &mut self,
+        _: &MarrowProtocol,
+        io: &mut T,
+        MarrowRequest(data): Self::Request,
+    ) -> io::Result<()>
+    where
+        T: AsyncWrite + Unpin + Send,
+    {
+        let len = data.len() as u32;
+        io.write_all(&len.to_be_bytes()).await?;
+        io.write_all(&data).await?;
+        io.flush().await?;
         Ok(())
+    }
+
+    async fn write_response<T>(
+        &mut self,
+        _: &MarrowProtocol,
+        io: &mut T,
+        MarrowResponse(data): Self::Response,
+    ) -> io::Result<()>
+    where
+        T: AsyncWrite + Unpin + Send,
+    {
+        let len = data.len() as u32;
+        io.write_all(&len.to_be_bytes()).await?;
+        io.write_all(&data).await?;
+        io.flush().await?;
+        Ok(())
+    }
+}
+
+impl AsRef<str> for MarrowProtocol {
+    fn as_ref(&self) -> &str {
+        "/marrow/p2p/1.0.0"
     }
 }
