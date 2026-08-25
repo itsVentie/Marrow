@@ -1,9 +1,9 @@
 use crate::behaviour::{MarrowBehaviour, MarrowBehaviourEvent};
 use crate::codec::{MarrowProtocol, MarrowRequest, MarrowResponse};
 use libp2p::{
-    autonat, identify, identity,
+    autonat, dcutr, identify, identity,
     kad::{store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
-    ping,
+    ping, relay,
     request_response::{Behaviour as RequestResponse, Config as ReqRespConfig, ProtocolSupport},
     swarm::SwarmEvent,
     Multiaddr, PeerId, StreamProtocol, Swarm,
@@ -29,6 +29,11 @@ pub enum NetworkCommand {
         data: Vec<u8>,
         sender: oneshot::Sender<Result<Vec<u8>, Box<dyn Error + Send + Sync>>>,
     },
+    ListenRelay {
+        relay_peer_id: PeerId,
+        relay_addr: Multiaddr,
+        sender: oneshot::Sender<Result<(), Box<dyn Error + Send + Sync>>>,
+    },
 }
 
 #[derive(Debug)]
@@ -36,6 +41,9 @@ pub enum NetworkEvent {
     FrameReceived {
         peer_id: PeerId,
         data: Vec<u8>,
+    },
+    HolePunchSuccessful {
+        peer_id: PeerId,
     },
 }
 
@@ -56,6 +64,8 @@ impl NetworkNode {
     {
         let local_peer_id = PeerId::from(keypair.public());
 
+        let (relay_transport, relay_client) = relay::client::new(local_peer_id);
+
         let proto = StreamProtocol::new("/marrow/kad/1.0.0");
         let kad_config = KademliaConfig::new(proto);
         let store = MemoryStore::new(local_peer_id);
@@ -68,6 +78,7 @@ impl NetworkNode {
 
         let ping = ping::Behaviour::new(ping::Config::default());
         let autonat = autonat::Behaviour::new(local_peer_id, autonat::Config::default());
+        let dcutr = dcutr::Behaviour::new(local_peer_id);
 
         let req_resp = RequestResponse::new(
             [(MarrowProtocol, ProtocolSupport::Full)],
@@ -79,6 +90,8 @@ impl NetworkNode {
             identify,
             ping,
             autonat,
+            relay_client,
+            dcutr,
             req_resp,
         };
 
@@ -90,6 +103,8 @@ impl NetworkNode {
                 libp2p::yamux::Config::default,
             )?
             .with_quic()
+            .with_dns()?
+            .with_relay_client(relay_transport)?
             .with_behaviour(|_| behaviour)?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
@@ -151,6 +166,25 @@ impl NetworkNode {
                     .send_request(&peer_id, MarrowRequest(data));
                 self.pending_responses.insert(req_id, sender);
             }
+            NetworkCommand::ListenRelay {
+                relay_peer_id,
+                relay_addr,
+                sender,
+            } => {
+                self.swarm
+                    .behaviour_mut()
+                    .kademlia
+                    .add_address(&relay_peer_id, relay_addr.clone());
+                let circuit_addr = relay_addr
+                    .with(libp2p::multiaddr::Protocol::P2p(relay_peer_id))
+                    .with(libp2p::multiaddr::Protocol::P2pCircuit);
+                let res = self
+                    .swarm
+                    .listen_on(circuit_addr)
+                    .map(|_| ())
+                    .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>);
+                let _ = sender.send(res);
+            }
         }
     }
 
@@ -183,6 +217,16 @@ impl NetworkNode {
                     }
                 }
             },
+            SwarmEvent::Behaviour(MarrowBehaviourEvent::Dcutr(
+                dcutr::Event::RemoteInitiatedDirectConnectionUpgrade { remote_peer_id, .. },
+            )) => {
+                let _ = self
+                    .event_sender
+                    .send(NetworkEvent::HolePunchSuccessful {
+                        peer_id: remote_peer_id,
+                    })
+                    .await;
+            }
             _ => {}
         }
     }
