@@ -74,8 +74,8 @@
 * [x] Implement stateless relay routing layer with ephemeral token validation in `apps/relay`.
 * [x] Design adaptive padding and timing jitter algorithms to obfuscate traffic size/metadata against DPI analysis.
 * [x] Design custom MarrowCodec and frame length framing over libp2p request-response protocol (`r-network`).
-* [ ] Build composite MarrowBehaviour routing structure (Kademlia DHT, Identify, Ping, AutoNAT).
-* [ ] Implement NetworkNode async event loop for Swarm driver and channel-based IPC interface (`NetworkCommand`/`NetworkEvent`).
+* [x] Build composite MarrowBehaviour routing structure (Kademlia DHT, Identify, Ping, AutoNAT).
+* [x] Implement NetworkNode async event loop for Swarm driver and channel-based IPC interface (`NetworkCommand`/`NetworkEvent`).
 * [ ] Implement libp2p hole punching (STUN/TURN/ICE / Relay v2) for direct peer connections behind NAT.
 * [ ] Connect `r-network` layer to Tauri state runtime and UI event dispatcher.
 
