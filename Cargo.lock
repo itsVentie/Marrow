@@ -3537,7 +3537,9 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "hex",
+ "libp2p",
  "r-crypto",
+ "r-network",
  "r-protocol",
  "r-storage",
  "serde",

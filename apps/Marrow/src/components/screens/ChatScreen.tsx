@@ -10,7 +10,7 @@ interface Props {
 
 export function ChatScreen({ session, onBack }: Props) {
   const messages = useSignal<DecryptedMessageDto[]>([]);
-  const payloadHex = useSignal("");
+  const textInput = useSignal("");
 
   const loadMessages = async () => {
     try {
@@ -23,24 +23,26 @@ export function ChatScreen({ session, onBack }: Props) {
 
   useEffect(() => {
     loadMessages();
+
+    const unlistenPromise = api.onFrameReceived(() => {
+      loadMessages();
+    });
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
   }, [session.id]);
 
-  const handleSimulateIncoming = async (e: Event) => {
+  const handleSendMessage = async (e: Event) => {
     e.preventDefault();
-    if (!payloadHex.value) return;
+    if (!textInput.value.trim()) return;
 
     try {
-      const rawFrame = Array.from(new TextEncoder().encode(payloadHex.value));
-      await api.processIncomingFrame(
-        rawFrame,
-        session.id,
-        session.peer_pubkey_hex,
-        Date.now()
-      );
-      payloadHex.value = "";
+      await api.sendMessage(session.id, session.peer_pubkey_hex, textInput.value);
+      textInput.value = "";
       loadMessages();
     } catch (err) {
-      alert("Failed to process frame: " + err);
+      alert("Failed to send message: " + err);
     }
   };
 
@@ -68,14 +70,14 @@ export function ChatScreen({ session, onBack }: Props) {
         })}
       </div>
 
-      <form onSubmit={handleSimulateIncoming} className={styles.inputArea}>
+      <form onSubmit={handleSendMessage} className={styles.inputArea}>
         <input
-          placeholder="Hex Payload or Text..."
-          value={payloadHex.value}
-          onInput={(e) => (payloadHex.value = (e.target as HTMLInputElement).value)}
+          placeholder="Type a message..."
+          value={textInput.value}
+          onInput={(e) => (textInput.value = (e.target as HTMLInputElement).value)}
           className={styles.input}
         />
-        <button type="submit" className={styles.sendBtn}>Inbound Frame</button>
+        <button type="submit" className={styles.sendBtn}>Send</button>
       </form>
     </div>
   );

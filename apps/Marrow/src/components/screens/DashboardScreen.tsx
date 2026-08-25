@@ -6,15 +6,16 @@ import styles from "../../styles/DashboardScreen.module.css";
 interface Props {
   identity: PublicIdentityDto;
   onSelectSession: (session: Session) => void;
+  onLogout: () => void;
 }
 
-export function DashboardScreen({ identity, onSelectSession }: Props) {
+export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) {
   const contacts = useSignal<Contact[]>([]);
   const sessions = useSignal<Session[]>([]);
 
-  const newAlias = useSignal("");
-  const newPubkey = useSignal("");
-  const peerSessionPubkey = useSignal("");
+  const newContactAlias = useSignal("");
+  const newContactPubkey = useSignal("");
+  const error = useSignal<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -24,8 +25,8 @@ export function DashboardScreen({ identity, onSelectSession }: Props) {
       ]);
       contacts.value = cList;
       sessions.value = sList;
-    } catch (err) {
-      console.error("Failed to load dashboard data:", err);
+    } catch (err: any) {
+      error.value = String(err);
     }
   };
 
@@ -35,86 +36,118 @@ export function DashboardScreen({ identity, onSelectSession }: Props) {
 
   const handleAddContact = async (e: Event) => {
     e.preventDefault();
-    if (!newAlias.value || !newPubkey.value) return;
+    if (!newContactPubkey.value.trim()) return;
+
     try {
-      await api.saveContact(newPubkey.value, newAlias.value);
-      newAlias.value = "";
-      newPubkey.value = "";
-      loadData();
-    } catch (err) {
-      alert("Error adding contact: " + err);
+      await api.saveContact(
+        newContactPubkey.value.trim(),
+        newContactAlias.value.trim() || "Peer"
+      );
+      newContactAlias.value = "";
+      newContactPubkey.value = "";
+      await loadData();
+    } catch (err: any) {
+      error.value = "Failed to save contact: " + String(err);
     }
   };
 
-  const handleCreateSession = async (e: Event) => {
-    e.preventDefault();
-    if (!peerSessionPubkey.value) return;
+  const handleStartSession = async (peerPubkey: string) => {
     try {
-      const session = await api.createSession(peerSessionPubkey.value);
-      peerSessionPubkey.value = "";
+      const session = await api.createSession(peerPubkey);
       onSelectSession(session);
-    } catch (err) {
-      alert("Error creating session: " + err);
+    } catch (err: any) {
+      error.value = "Failed to create session: " + String(err);
     }
+  };
+
+  const handleDeleteSession = async (sessionId: string, e: Event) => {
+    e.stopPropagation();
+    try {
+      await api.deleteSession(sessionId);
+      await loadData();
+    } catch (err: any) {
+      error.value = String(err);
+    }
+  };
+
+  const handleLogoutClick = async () => {
+    await api.logoutIdentity();
+    onLogout();
   };
 
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <h3>Marrow</h3>
-        <div className={styles.myKey}>My Key: {identity.pubkey_hex.slice(0, 16)}...</div>
+        <div>
+          <h3>Marrow Node</h3>
+          <div className={styles.pubkey}>ID: {identity.pubkey_hex.slice(0, 16)}...</div>
+        </div>
+        <button onClick={handleLogoutClick} className={styles.logoutBtn}>Logout</button>
       </header>
 
-      <div className={styles.grid}>
-        <section className={styles.section}>
-          <h4>Active Sessions</h4>
-          <form onSubmit={handleCreateSession} className={styles.inlineForm}>
-            <input
-              placeholder="Public Key (Hex)"
-              value={peerSessionPubkey.value}
-              onInput={(e) => (peerSessionPubkey.value = (e.target as HTMLInputElement).value)}
-              className={styles.input}
-            />
-            <button type="submit" className={styles.btn}>Start Chat</button>
-          </form>
+      {error.value && <div className={styles.error}>{error.value}</div>}
 
+      <div className={styles.grid}>
+        {/* Active Sessions Panel */}
+        <section className={styles.panel}>
+          <h4>Active Sessions</h4>
           <div className={styles.list}>
             {sessions.value.map((s) => (
-              <div key={s.id} onClick={() => onSelectSession(s)} className={styles.item}>
+              <div
+                key={s.id}
+                onClick={() => onSelectSession(s)}
+                className={styles.sessionCard}
+              >
                 <div>
-                  <strong>Session:</strong> {s.id.slice(0, 8)}...
+                  <div className={styles.sessionTitle}>{s.id.slice(0, 12)}...</div>
+                  <div className={styles.peerId}>Peer: {s.peer_pubkey_hex.slice(0, 10)}...</div>
                 </div>
-                <div className={styles.subtext}>Peer: {s.peer_pubkey_hex.slice(0, 12)}...</div>
+                <button
+                  onClick={(e) => handleDeleteSession(s.id, e)}
+                  className={styles.deleteBtn}
+                >
+                  ✕
+                </button>
               </div>
             ))}
+            {sessions.value.length === 0 && <p className={styles.empty}>No active sessions</p>}
           </div>
         </section>
 
-        <section className={styles.section}>
-          <h4>Contacts</h4>
-          <form onSubmit={handleAddContact} className={styles.verticalForm}>
+        {/* Contacts & Add Panel */}
+        <section className={styles.panel}>
+          <h4>Add Contact</h4>
+          <form onSubmit={handleAddContact} className={styles.form}>
             <input
-              placeholder="Alias"
-              value={newAlias.value}
-              onInput={(e) => (newAlias.value = (e.target as HTMLInputElement).value)}
-              className={styles.input}
+              placeholder="Alias (e.g. Alice)"
+              value={newContactAlias.value}
+              onInput={(e) => newContactAlias.value = (e.target as HTMLInputElement).value}
             />
             <input
-              placeholder="Public Key (Hex)"
-              value={newPubkey.value}
-              onInput={(e) => (newPubkey.value = (e.target as HTMLInputElement).value)}
-              className={styles.input}
+              placeholder="Public Key Hex"
+              value={newContactPubkey.value}
+              onInput={(e) => newContactPubkey.value = (e.target as HTMLInputElement).value}
             />
-            <button type="submit" className={styles.btn}>Save Contact</button>
+            <button type="submit">Save Contact</button>
           </form>
 
+          <h4>Contacts</h4>
           <div className={styles.list}>
             {contacts.value.map((c) => (
-              <div key={c.pubkey_hex} className={styles.item}>
-                <div><strong>{c.alias}</strong></div>
-                <div className={styles.subtext}>{c.pubkey_hex.slice(0, 16)}...</div>
+              <div key={c.pubkey_hex} className={styles.contactCard}>
+                <div>
+                  <strong>{c.alias}</strong>
+                  <div className={styles.peerId}>{c.pubkey_hex.slice(0, 12)}...</div>
+                </div>
+                <button
+                  onClick={() => handleStartSession(c.pubkey_hex)}
+                  className={styles.startBtn}
+                >
+                  Chat
+                </button>
               </div>
             ))}
+            {contacts.value.length === 0 && <p className={styles.empty}>No saved contacts</p>}
           </div>
         </section>
       </div>

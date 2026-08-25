@@ -4,197 +4,129 @@ import { api, KeyFileInfoDto, PublicIdentityDto } from "../../api/tauri";
 import styles from "../../styles/AuthScreen.module.css";
 
 interface Props {
-  onAuthenticated: (identity: PublicIdentityDto) => void;
+  onUnlocked: (identity: PublicIdentityDto) => void;
 }
 
-export function AuthScreen({ onAuthenticated }: Props) {
-  const password = useSignal("");
-  const keyAlias = useSignal("");
+export function AuthScreen({ onUnlocked }: Props) {
   const isCreateMode = useSignal(false);
-  const loading = useSignal(false);
+  const keyFiles = useSignal<KeyFileInfoDto[]>([]);
+  const selectedFile = useSignal<string>("");
+
+  const password = useSignal("");
+  const alias = useSignal("");
   const error = useSignal<string | null>(null);
+  const isLoading = useSignal(false);
 
-  const availableKeys = useSignal<KeyFileInfoDto[]>([]);
-  const selectedKeyPath = useSignal<string>("");
-
-  const refreshKeyList = async () => {
+  const loadKeys = async () => {
     try {
-      const keys = await api.listIdentityFiles();
-      availableKeys.value = keys;
-      if (keys.length > 0 && !selectedKeyPath.value) {
-        selectedKeyPath.value = keys[0].path;
+      await api.initStorage();
+      const files = await api.listIdentityFiles();
+      keyFiles.value = files;
+      if (files.length > 0 && !selectedFile.value) {
+        selectedFile.value = files[0].path;
       }
-    } catch (err) {
-      console.error("Failed to fetch keys:", err);
+    } catch (err: any) {
+      error.value = String(err);
     }
   };
 
   useEffect(() => {
-    const checkState = async () => {
-      try {
-        await api.initStorage();
-        const active = await api.getCurrentIdentity();
-        if (active) {
-          onAuthenticated(active);
-          return;
-        }
-        await refreshKeyList();
-      } catch (err) {
-        console.error("Storage init error:", err);
-      }
-    };
-    checkState();
+    loadKeys();
   }, []);
 
-  const handleAction = async (e: Event) => {
+  const handleUnlock = async (e: Event) => {
     e.preventDefault();
-    if (!password.value) {
-      error.value = "Password cannot be empty";
-      return;
-    }
+    if (!selectedFile.value || !password.value) return;
 
-    loading.value = true;
+    isLoading.value = true;
     error.value = null;
 
     try {
-      if (isCreateMode.value) {
-        const identity = await api.createIdentity(
-          password.value,
-          keyAlias.value || undefined
-        );
-        onAuthenticated(identity);
-      } else {
-        if (!selectedKeyPath.value) {
-          error.value = "Select a key file first";
-          loading.value = false;
-          return;
-        }
-        const identity = await api.unlockIdentityFromFile(
-          selectedKeyPath.value,
-          password.value
-        );
-        onAuthenticated(identity);
-      }
+      const identity = await api.unlockIdentityFromFile(selectedFile.value, password.value);
+      onUnlocked(identity);
     } catch (err: any) {
-      error.value = typeof err === "string" ? err : "Authentication failed";
+      error.value = "Failed to unlock key: " + String(err);
     } finally {
-      loading.value = false;
+      isLoading.value = false;
     }
   };
 
-  const handleExternalImport = async () => {
-    try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: "Identity Key", extensions: ["key"] }],
-      });
+  const handleCreate = async (e: Event) => {
+    e.preventDefault();
+    if (!password.value) return;
 
-      if (selected && typeof selected === "string") {
-        const imported = await api.importIdentityFile(selected);
-        await refreshKeyList();
-        selectedKeyPath.value = imported.path;
-      }
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const identity = await api.createIdentity(password.value, alias.value || undefined);
+      onUnlocked(identity);
     } catch (err: any) {
-      error.value = typeof err === "string" ? err : "Failed to import key file";
+      error.value = "Failed to create identity: " + String(err);
+    } finally {
+      isLoading.value = false;
     }
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <h2 className={styles.title}>
-          {isCreateMode.value ? "Create New Key" : "Unlock Identity"}
-        </h2>
+        <h2>{isCreateMode.value ? "Create New Vault" : "Unlock Identity"}</h2>
+
         {error.value && <div className={styles.error}>{error.value}</div>}
 
-        <form onSubmit={handleAction} className={styles.form}>
-          {!isCreateMode.value && (
-            <div className={styles.fieldGroup}>
-              <label className={styles.label}>Select Identity Key</label>
-              {availableKeys.value.length > 0 ? (
-                <select
-                  value={selectedKeyPath.value}
-                  onChange={(e) =>
-                    (selectedKeyPath.value = (
-                      e.target as HTMLSelectElement
-                    ).value)
-                  }
-                  className={styles.select}
-                  disabled={loading.value}
-                >
-                  {availableKeys.value.map((k) => (
-                    <option key={k.path} value={k.path}>
-                      {k.filename}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div className={styles.emptyNotice}>
-                  No saved keys found. Import one or create new.
-                </div>
-              )}
+        {!isCreateMode.value ? (
+          <form onSubmit={handleUnlock}>
+            <div className={styles.field}>
+              <label>Select Key File</label>
+              <select
+                value={selectedFile.value}
+                onChange={(e) => selectedFile.value = (e.target as HTMLSelectElement).value}
+              >
+                {keyFiles.value.map((f) => (
+                  <option key={f.path} value={f.path}>{f.filename}</option>
+                ))}
+              </select>
             </div>
-          )}
 
-          {isCreateMode.value && (
-            <div className={styles.fieldGroup}>
-              <label className={styles.label}>Key Name / Alias (Optional)</label>
+            <div className={styles.field}>
+              <label>Password</label>
               <input
-                type="text"
-                placeholder="e.g. main_account"
-                value={keyAlias.value}
-                onInput={(e) =>
-                  (keyAlias.value = (e.target as HTMLInputElement).value)
-                }
-                disabled={loading.value}
-                className={styles.input}
+                type="password"
+                value={password.value}
+                onInput={(e) => password.value = (e.target as HTMLInputElement).value}
               />
             </div>
-          )}
 
-          <div className={styles.fieldGroup}>
-            <label className={styles.label}>Master Password</label>
-            <input
-              type="password"
-              placeholder={
-                isCreateMode.value
-                  ? "Set Master Password"
-                  : "Enter Master Password"
-              }
-              value={password.value}
-              onInput={(e) =>
-                (password.value = (e.target as HTMLInputElement).value)
-              }
-              disabled={loading.value}
-              className={styles.input}
-            />
-          </div>
+            <button type="submit" disabled={isLoading.value} className={styles.primaryBtn}>
+              {isLoading.value ? "Unlocking..." : "Unlock"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleCreate}>
+            <div className={styles.field}>
+              <label>Key Alias (Optional)</label>
+              <input
+                type="text"
+                placeholder="my_device"
+                value={alias.value}
+                onInput={(e) => alias.value = (e.target as HTMLInputElement).value}
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={
-              loading.value ||
-              (!isCreateMode.value && availableKeys.value.length === 0)
-            }
-            className={styles.button}
-          >
-            {loading.value
-              ? "Processing..."
-              : isCreateMode.value
-              ? "Generate Key & Login"
-              : "Unlock Account"}
-          </button>
-        </form>
+            <div className={styles.field}>
+              <label>Set Master Password</label>
+              <input
+                type="password"
+                value={password.value}
+                onInput={(e) => password.value = (e.target as HTMLInputElement).value}
+              />
+            </div>
 
-        {!isCreateMode.value && (
-          <button
-            onClick={handleExternalImport}
-            className={styles.importBtn}
-            disabled={loading.value}
-          >
-            Import .key file...
-          </button>
+            <button type="submit" disabled={isLoading.value} className={styles.primaryBtn}>
+              {isLoading.value ? "Generating..." : "Generate Keypair"}
+            </button>
+          </form>
         )}
 
         <button
@@ -202,11 +134,9 @@ export function AuthScreen({ onAuthenticated }: Props) {
             isCreateMode.value = !isCreateMode.value;
             error.value = null;
           }}
-          className={styles.toggleBtn}
+          className={styles.switchBtn}
         >
-          {isCreateMode.value
-            ? "Already have a key? Unlock existing"
-            : "No key? Generate new identity"}
+          {isCreateMode.value ? "Already have a key? Unlock" : "Create new identity key"}
         </button>
       </div>
     </div>

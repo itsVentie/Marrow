@@ -21,7 +21,9 @@ tokio = { workspace = true }
 bincode = "1.3"
 hex = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
+libp2p = { version = "0.54", features = ["ed25519"] }
 
 r-crypto = { workspace = true }
 r-protocol = { workspace = true }
 r-storage = { workspace = true }
+r-network = { workspace = true }

@@ -2,13 +2,13 @@ mod state;
 mod tray;
 
 use r_crypto::Identity;
-use r_protocol::Frame;
+use r_network::{NetworkCommand, NetworkEvent, NetworkNode};
 use r_storage::{Contact, MessageDirection, Session, StorageEngine, StoredMessage};
 use state::AppState;
 use std::fmt::Display;
 use std::fs;
 use std::path::PathBuf;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 
 #[inline]
 fn map_err_str<E: Display>(err: E) -> String {
@@ -34,6 +34,12 @@ struct DecryptedMessageDto {
     timestamp: i64,
     direction: MessageDirection,
     sequence_number: u64,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct NetworkEventPayload {
+    peer_id: String,
+    data_hex: Option<String>,
 }
 
 #[tauri::command]
@@ -123,18 +129,52 @@ fn create_identity(
 fn unlock_identity_from_file(
     file_path: String,
     password: String,
+    app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<PublicIdentityDto, String> {
     let bytes = fs::read(&file_path).map_err(map_err_str)?;
     let vault = bincode::deserialize(&bytes).map_err(map_err_str)?;
 
     let identity = Identity::import_encrypted(&vault, password.as_bytes()).map_err(map_err_str)?;
-
     let pubkey_hex = identity.public_hex();
 
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
     if let Some(storage) = storage_guard.as_ref() {
         let _ = storage.save_vault(&vault);
+    }
+
+    let keypair = libp2p::identity::Keypair::generate_ed25519();
+    if let Ok((node, cmd_tx, mut event_rx)) = NetworkNode::new(keypair) {
+        tauri::async_runtime::spawn(node.run());
+
+        let handle_clone = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            while let Some(event) = event_rx.recv().await {
+                match event {
+                    NetworkEvent::FrameReceived { peer_id, data } => {
+                        let _ = handle_clone.emit(
+                            "network://frame_received",
+                            NetworkEventPayload {
+                                peer_id: peer_id.to_string(),
+                                data_hex: Some(hex::encode(data)),
+                            },
+                        );
+                    }
+                    NetworkEvent::HolePunchSuccessful { peer_id } => {
+                        let _ = handle_clone.emit(
+                            "network://hole_punch_success",
+                            NetworkEventPayload {
+                                peer_id: peer_id.to_string(),
+                                data_hex: None,
+                            },
+                        );
+                    }
+                }
+            }
+        });
+
+        let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
+        *cmd_guard = Some(cmd_tx);
     }
 
     let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
@@ -182,6 +222,8 @@ fn get_current_identity(state: State<'_, AppState>) -> Result<Option<PublicIdent
 fn logout_identity(state: State<'_, AppState>) -> Result<(), String> {
     let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
     *identity_guard = None;
+    let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
+    *cmd_guard = None;
     Ok(())
 }
 
@@ -260,49 +302,68 @@ fn delete_session(session_id: String, state: State<'_, AppState>) -> Result<bool
 }
 
 #[tauri::command]
-fn process_incoming_frame(
-    raw_frame: Vec<u8>,
+async fn send_chat_message(
     session_id: String,
-    sender_pubkey_hex: String,
-    sequence_number: u64,
+    peer_pubkey_hex: String,
+    text: String,
     state: State<'_, AppState>,
 ) -> Result<DecryptedMessageDto, String> {
-    let frame = Frame::decode(&raw_frame).map_err(map_err_str)?;
-
-    let ciphertext = match frame {
-        Frame::Message(payload) => payload.ciphertext,
-        _ => return Err("Expected Frame::Message type".to_string()),
-    };
-
-    let storage_guard = state.storage.lock().map_err(map_err_str)?;
-    let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
-
+    let payload_bytes = text.into_bytes();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(map_err_str)?
         .as_secs() as i64;
 
-    let stored_msg = StoredMessage {
-        session_id: session_id.clone(),
-        sender_pubkey_hex: sender_pubkey_hex.clone(),
-        ciphertext: ciphertext.clone(),
-        timestamp: now,
-        direction: MessageDirection::Inbound,
-        sequence_number,
+    let pubkey = {
+        let identity_guard = state.identity.lock().map_err(map_err_str)?;
+        let identity = identity_guard.as_ref().ok_or("Identity not unlocked")?;
+        identity.public_hex()
     };
 
-    storage.store_message(&stored_msg).map_err(map_err_str)?;
-    storage
-        .update_session_activity(&session_id, now)
-        .map_err(map_err_str)?;
+    let stored_msg = StoredMessage {
+        session_id: session_id.clone(),
+        sender_pubkey_hex: pubkey.clone(),
+        ciphertext: payload_bytes.clone(),
+        timestamp: now,
+        direction: MessageDirection::Outbound,
+        sequence_number: 0,
+    };
+
+    {
+        let storage_guard = state.storage.lock().map_err(map_err_str)?;
+        let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
+        storage.store_message(&stored_msg).map_err(map_err_str)?;
+        storage
+            .update_session_activity(&session_id, now)
+            .map_err(map_err_str)?;
+    }
+
+    let cmd_tx = {
+        let guard = state.network_cmd.lock().map_err(map_err_str)?;
+        guard.as_ref().cloned()
+    };
+
+    if let Some(tx) = cmd_tx {
+        if let Ok(peer_id) = peer_pubkey_hex.parse::<libp2p::PeerId>() {
+            let (oneshot_tx, oneshot_rx) = tokio::sync::oneshot::channel();
+            let _ = tx
+                .send(NetworkCommand::SendFrame {
+                    peer_id,
+                    data: payload_bytes.clone(),
+                    sender: oneshot_tx,
+                })
+                .await;
+            let _ = oneshot_rx.await;
+        }
+    }
 
     Ok(DecryptedMessageDto {
         session_id,
-        sender_pubkey_hex,
-        payload_hex: hex::encode(ciphertext),
+        sender_pubkey_hex: pubkey,
+        payload_hex: hex::encode(payload_bytes),
         timestamp: now,
-        direction: MessageDirection::Inbound,
-        sequence_number,
+        direction: MessageDirection::Outbound,
+        sequence_number: 0,
     })
 }
 
@@ -361,7 +422,7 @@ pub fn run() {
             create_session,
             list_sessions,
             delete_session,
-            process_incoming_frame,
+            send_chat_message,
             get_session_messages,
         ])
         .run(tauri::generate_context!())

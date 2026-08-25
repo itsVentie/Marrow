@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
 
 export interface PublicIdentityDto {
   pubkey_hex: string;
@@ -31,6 +32,11 @@ export interface DecryptedMessageDto {
   sequence_number: number;
 }
 
+export interface NetworkEventPayload {
+  peer_id: string;
+  data_hex?: string;
+}
+
 export const api = {
   initStorage: () => invoke<void>("init_storage"),
   listIdentityFiles: () => invoke<KeyFileInfoDto[]>("list_identity_files"),
@@ -56,20 +62,16 @@ export const api = {
   listSessions: () => invoke<Session[]>("list_sessions"),
   deleteSession: (session_id: string) =>
     invoke<boolean>("delete_session", { sessionId: session_id }),
-  processIncomingFrame: (
-    raw_frame: number[],
-    session_id: string,
-    sender_pubkey_hex: string,
-    sequence_number: number
-  ) =>
-    invoke<DecryptedMessageDto>("process_incoming_frame", {
-      rawFrame: raw_frame,
-      sessionId: session_id,
-      senderPubkeyHex: sender_pubkey_hex,
-      sequenceNumber: sequence_number,
+  sendMessage: (sessionId: string, peerPubkeyHex: string, text: string) =>
+    invoke<DecryptedMessageDto>("send_chat_message", {
+      sessionId,
+      peerPubkeyHex,
+      text,
     }),
   getSessionMessages: (session_id: string) =>
     invoke<DecryptedMessageDto[]>("get_session_messages", {
       sessionId: session_id,
     }),
+  onFrameReceived: (cb: (payload: NetworkEventPayload) => void): Promise<UnlistenFn> =>
+    listen<NetworkEventPayload>("network://frame_received", (e) => cb(e.payload)),
 };

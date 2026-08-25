@@ -14,17 +14,26 @@ export function App() {
     (async () => {
       try {
         await api.initStorage();
-        const current = await api.getCurrentIdentity();
-        if (current) {
-          identity.value = current;
-        }
+
+        await api.logoutIdentity();
       } catch (e) {
-        console.warn("No active vault session:", e);
+        console.warn("Storage init warning:", e);
       } finally {
         loading.value = false;
       }
     })();
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await api.logoutIdentity();
+    } catch (e) {
+      console.error("Failed to logout:", e);
+    } finally {
+      identity.value = null;
+      activeSession.value = null;
+    }
+  };
 
   if (loading.value) {
     return (
@@ -51,6 +60,7 @@ export function App() {
     <DashboardScreen
       identity={identity.value}
       onSelectSession={(session) => (activeSession.value = session)}
+      onLogout={handleLogout}
     />
   );
 }
