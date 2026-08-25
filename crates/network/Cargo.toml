@@ -4,14 +4,31 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+r-crypto = { workspace = true }
 r-protocol = { workspace = true }
-tokio = { workspace = true, features = ["net", "io-util", "sync"] }
+
+libp2p = { version = "0.54", features = [
+    "tokio",
+    "gossipsub",
+    "kad",
+    "identify",
+    "ping",
+    "noise",
+    "tcp",
+    "quic",
+    "yamux",
+    "request-response",
+    "relay",
+    "autonat",
+    "macros",
+] }
+tokio = { workspace = true, features = ["net", "io-util", "sync", "rt-multi-thread", "macros"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 bytes = "1.6"
 futures = "0.3"
 thiserror = { workspace = true }
-
+serde = { version = "1.0", features = ["derive"] }
+async-trait = "0.1"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
-r-crypto = { workspace = true }
