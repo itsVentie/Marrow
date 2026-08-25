@@ -1,13 +1,14 @@
 use crate::behaviour::{MarrowBehaviour, MarrowBehaviourEvent};
 use crate::codec::{MarrowProtocol, MarrowRequest, MarrowResponse};
 use libp2p::{
-    autonat, dcutr, identify, identity,
+    autonat, identify, identity,
     kad::{store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
     ping, relay,
     request_response::{Behaviour as RequestResponse, Config as ReqRespConfig, ProtocolSupport},
     swarm::SwarmEvent,
     Multiaddr, PeerId, StreamProtocol, Swarm,
 };
+use libp2p_dcutr as dcutr;
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::Duration;
