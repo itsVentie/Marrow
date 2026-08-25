@@ -1,14 +1,13 @@
 use crate::behaviour::{MarrowBehaviour, MarrowBehaviourEvent};
 use crate::codec::{MarrowProtocol, MarrowRequest, MarrowResponse};
 use libp2p::{
-    autonat, identify, identity,
+    autonat, dcutr, identify, identity,
     kad::{store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
-    ping, relay,
+    ping,
     request_response::{Behaviour as RequestResponse, Config as ReqRespConfig, ProtocolSupport},
     swarm::SwarmEvent,
     Multiaddr, PeerId, StreamProtocol, Swarm,
 };
-use libp2p_dcutr as dcutr;
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::Duration;
@@ -39,13 +38,8 @@ pub enum NetworkCommand {
 
 #[derive(Debug)]
 pub enum NetworkEvent {
-    FrameReceived {
-        peer_id: PeerId,
-        data: Vec<u8>,
-    },
-    HolePunchSuccessful {
-        peer_id: PeerId,
-    },
+    FrameReceived { peer_id: PeerId, data: Vec<u8> },
+    HolePunchSuccessful { peer_id: PeerId },
 }
 
 pub struct NetworkNode {
@@ -61,40 +55,15 @@ pub struct NetworkNode {
 impl NetworkNode {
     pub fn new(
         keypair: identity::Keypair,
-    ) -> Result<(Self, mpsc::Sender<NetworkCommand>, mpsc::Receiver<NetworkEvent>), Box<dyn Error>>
-    {
+    ) -> Result<
+        (
+            Self,
+            mpsc::Sender<NetworkCommand>,
+            mpsc::Receiver<NetworkEvent>,
+        ),
+        Box<dyn Error>,
+    > {
         let local_peer_id = PeerId::from(keypair.public());
-
-        let (relay_transport, relay_client) = relay::client::new(local_peer_id);
-
-        let proto = StreamProtocol::new("/marrow/kad/1.0.0");
-        let kad_config = KademliaConfig::new(proto);
-        let store = MemoryStore::new(local_peer_id);
-        let kademlia = Kademlia::with_config(local_peer_id, store, kad_config);
-
-        let identify = identify::Behaviour::new(identify::Config::new(
-            "/marrow/1.0.0".to_string(),
-            keypair.public(),
-        ));
-
-        let ping = ping::Behaviour::new(ping::Config::default());
-        let autonat = autonat::Behaviour::new(local_peer_id, autonat::Config::default());
-        let dcutr = dcutr::Behaviour::new(local_peer_id);
-
-        let req_resp = RequestResponse::new(
-            [(MarrowProtocol, ProtocolSupport::Full)],
-            ReqRespConfig::default(),
-        );
-
-        let behaviour = MarrowBehaviour {
-            kademlia,
-            identify,
-            ping,
-            autonat,
-            relay_client,
-            dcutr,
-            req_resp,
-        };
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
             .with_tokio()
@@ -105,8 +74,37 @@ impl NetworkNode {
             )?
             .with_quic()
             .with_dns()?
-            .with_relay_client(relay_transport)?
-            .with_behaviour(|_| behaviour)?
+            .with_relay_client(libp2p::noise::Config::new, libp2p::yamux::Config::default)?
+            .with_behaviour(|key, relay_behaviour| {
+                let proto = StreamProtocol::new("/marrow/kad/1.0.0");
+                let kad_config = KademliaConfig::new(proto);
+                let store = MemoryStore::new(local_peer_id);
+                let kademlia = Kademlia::with_config(local_peer_id, store, kad_config);
+
+                let identify = identify::Behaviour::new(identify::Config::new(
+                    "/marrow/1.0.0".to_string(),
+                    key.public(),
+                ));
+
+                let ping = ping::Behaviour::new(ping::Config::default());
+                let autonat = autonat::Behaviour::new(local_peer_id, autonat::Config::default());
+                let dcutr_behaviour = dcutr::Behaviour::new(local_peer_id);
+
+                let req_resp = RequestResponse::new(
+                    [(MarrowProtocol, ProtocolSupport::Full)],
+                    ReqRespConfig::default(),
+                );
+
+                MarrowBehaviour {
+                    kademlia,
+                    identify,
+                    ping,
+                    autonat,
+                    relay: relay_behaviour,
+                    dcutr: dcutr_behaviour,
+                    req_resp,
+                }
+            })?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
 
@@ -148,7 +146,11 @@ impl NetworkNode {
                     .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>);
                 let _ = sender.send(res);
             }
-            NetworkCommand::Dial { peer_id, addr, sender } => {
+            NetworkCommand::Dial {
+                peer_id,
+                addr,
+                sender,
+            } => {
                 self.swarm
                     .behaviour_mut()
                     .kademlia
@@ -159,7 +161,11 @@ impl NetworkNode {
                     .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>);
                 let _ = sender.send(res);
             }
-            NetworkCommand::SendFrame { peer_id, data, sender } => {
+            NetworkCommand::SendFrame {
+                peer_id,
+                data,
+                sender,
+            } => {
                 let req_id = self
                     .swarm
                     .behaviour_mut()
@@ -212,15 +218,19 @@ impl NetworkNode {
                         .req_resp
                         .send_response(channel, MarrowResponse(vec![1]));
                 }
-                libp2p::request_response::Message::Response { request_id, response } => {
+                libp2p::request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
                     if let Some(sender) = self.pending_responses.remove(&request_id) {
                         let _ = sender.send(Ok(response.0));
                     }
                 }
             },
-            SwarmEvent::Behaviour(MarrowBehaviourEvent::Dcutr(
-                dcutr::Event::RemoteInitiatedDirectConnectionUpgrade { remote_peer_id, .. },
-            )) => {
+            SwarmEvent::Behaviour(MarrowBehaviourEvent::Dcutr(dcutr::Event {
+                remote_peer_id,
+                result: Ok(_),
+            })) => {
                 let _ = self
                     .event_sender
                     .send(NetworkEvent::HolePunchSuccessful {
