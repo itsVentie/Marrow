@@ -1,4 +1,4 @@
-use crate::codec::{MarrowCodec, MarrowProtocol};
+use crate::codec::MarrowCodec;
 use libp2p::autonat;
 use libp2p::identify;
 use libp2p::kad::{store::MemoryStore, Behaviour as Kademlia};
