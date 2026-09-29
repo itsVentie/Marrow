@@ -14,6 +14,8 @@ pub mod handshake;
 pub mod mnemonic;
 pub mod ratchet;
 
+pub use x25519_dalek;
+pub use ratchet::DoubleRatchet;
 pub use mnemonic::MnemonicKey;
 
 #[derive(Error, Debug)]

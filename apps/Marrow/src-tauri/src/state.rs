@@ -1,4 +1,5 @@
-use r_crypto::{DoubleRatchet, Identity};
+use r_crypto::ratchet::DoubleRatchet;
+use r_crypto::Identity;
 use r_network::NetworkCommand;
 use r_storage::StorageEngine;
 use std::collections::HashMap;

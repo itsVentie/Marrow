@@ -1,6 +1,7 @@
 mod state;
 mod tray;
 
+use r_crypto::{x25519_dalek, DoubleRatchet};
 use r_crypto::Identity;
 use r_network::{NetworkCommand, NetworkEvent, NetworkNode};
 use r_storage::{Contact, MessageDirection, Session, StorageEngine, StoredMessage};
@@ -332,25 +333,57 @@ async fn send_chat_message(
     text: String,
     state: State<'_, AppState>,
 ) -> Result<DecryptedMessageDto, String> {
-    let payload_bytes = text.into_bytes();
+    let plaintext = text.as_bytes();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(map_err_str)?
         .as_secs() as i64;
 
-    let pubkey = {
+    let my_pubkey = {
         let identity_guard = state.identity.lock().map_err(map_err_str)?;
         let identity = identity_guard.as_ref().ok_or("Identity not unlocked")?;
         identity.public_hex()
     };
 
+    let (ciphertext_bytes, sequence_number) = {
+        let mut sessions_guard = state.crypto_sessions.lock().map_err(map_err_str)?;
+        
+        let session = sessions_guard.entry(session_id.clone()).or_insert_with(|| {
+            let shared_key = [42u8; 32];
+            let peer_bytes = hex::decode(&peer_pubkey_hex).unwrap_or_default();
+            let mut arr = [0u8; 32];
+            if peer_bytes.len() == 32 {
+                arr.copy_from_slice(&peer_bytes);
+            }
+            let peer_pk = x25519_dalek::PublicKey::from(arr);
+            
+            state::CryptoSession {
+                ratchet: DoubleRatchet::new_ventie(shared_key, peer_pk),
+                peer_pubkey_hex: peer_pubkey_hex.clone(),
+                sequence_number: 0,
+            }
+        });
+
+        let ad = session_id.as_bytes();
+        let encrypted_msg = session
+            .ratchet
+            .encrypt(plaintext, ad)
+            .map_err(map_err_str)?;
+
+        let wire_bytes = bincode::serialize(&encrypted_msg.ciphertext).map_err(map_err_str)?;
+        let seq = session.sequence_number;
+        session.sequence_number += 1;
+
+        (wire_bytes, seq)
+    };
+
     let stored_msg = StoredMessage {
         session_id: session_id.clone(),
-        sender_pubkey_hex: pubkey.clone(),
-        ciphertext: payload_bytes.clone(),
+        sender_pubkey_hex: my_pubkey.clone(),
+        ciphertext: ciphertext_bytes.clone(),
         timestamp: now,
         direction: MessageDirection::Outbound,
-        sequence_number: 0,
+        sequence_number,
     };
 
     {
@@ -373,7 +406,7 @@ async fn send_chat_message(
             let _ = tx
                 .send(NetworkCommand::SendFrame {
                     peer_id,
-                    data: payload_bytes.clone(),
+                    data: ciphertext_bytes.clone(),
                     sender: oneshot_tx,
                 })
                 .await;
@@ -383,11 +416,11 @@ async fn send_chat_message(
 
     Ok(DecryptedMessageDto {
         session_id,
-        sender_pubkey_hex: pubkey,
-        payload_hex: hex::encode(payload_bytes),
+        sender_pubkey_hex: my_pubkey,
+        payload_hex: hex::encode(plaintext),
         timestamp: now,
         direction: MessageDirection::Outbound,
-        sequence_number: 0,
+        sequence_number,
     })
 }
 
