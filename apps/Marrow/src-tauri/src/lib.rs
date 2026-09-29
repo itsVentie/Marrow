@@ -15,6 +15,28 @@ fn map_err_str<E: Display>(err: E) -> String {
     err.to_string()
 }
 
+fn sanitize_filename(name: &str) -> String {
+    name.chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+        .collect()
+}
+
+fn pubkey_hex_to_peer_id(pubkey_hex: &str) -> Result<libp2p::PeerId, String> {
+    let bytes = hex::decode(pubkey_hex).map_err(map_err_str)?;
+    let ed25519_pk = libp2p::identity::ed25519::PublicKey::try_from_bytes(&bytes)
+        .map_err(|_| "Invalid Ed25519 public key bytes")?;
+    let public_key = libp2p::identity::PublicKey::from(ed25519_pk);
+    Ok(public_key.to_peer_id())
+}
+
+fn derive_network_keypair(identity: &Identity) -> Result<libp2p::identity::Keypair, String> {
+    let mut secret_bytes = identity.secret_bytes();
+    let ed25519_sk = libp2p::identity::ed25519::SecretKey::try_from_bytes(&mut secret_bytes)
+        .map_err(|_| "Failed to derive network keypair")?;
+    let keypair = libp2p::identity::Keypair::from(libp2p::identity::ed25519::Keypair::from(ed25519_sk));
+    Ok(keypair)
+}
+
 #[derive(serde::Serialize)]
 struct PublicIdentityDto {
     pubkey_hex: String,
@@ -108,9 +130,11 @@ fn create_identity(
     let pubkey_hex = identity.public_hex();
     let short_pubkey = &pubkey_hex[..8];
 
-    let filename = match alias {
-        Some(ref a) if !a.trim().is_empty() => format!("{}.key", a.trim()),
-        _ => format!("identity_{}.key", short_pubkey),
+    let clean_alias = alias.as_deref().map(sanitize_filename).unwrap_or_default();
+    let filename = if !clean_alias.is_empty() {
+        format!("{}.key", clean_alias)
+    } else {
+        format!("identity_{}.key", short_pubkey)
     };
 
     let bytes = bincode::serialize(&vault).map_err(map_err_str)?;
@@ -143,7 +167,7 @@ fn unlock_identity_from_file(
         let _ = storage.save_vault(&vault);
     }
 
-    let keypair = libp2p::identity::Keypair::generate_ed25519();
+    let keypair = derive_network_keypair(&identity)?;
     if let Ok((node, cmd_tx, mut event_rx)) = NetworkNode::new(keypair) {
         tauri::async_runtime::spawn(node.run());
 
@@ -193,14 +217,14 @@ fn import_identity_file(
         return Err("Source file does not exist".into());
     }
 
-    let filename = src
+    let raw_filename = src
         .file_name()
         .ok_or("Invalid file name")?
-        .to_string_lossy()
-        .to_string();
+        .to_string_lossy();
+    let filename = sanitize_filename(&raw_filename);
 
     let app_dir = app_handle.path().app_data_dir().map_err(map_err_str)?;
-    let dest = app_dir.join(&filename);
+    let dest = app_dir.join(format!("{}.key", filename));
 
     fs::copy(&src, &dest).map_err(map_err_str)?;
 
@@ -344,7 +368,7 @@ async fn send_chat_message(
     };
 
     if let Some(tx) = cmd_tx {
-        if let Ok(peer_id) = peer_pubkey_hex.parse::<libp2p::PeerId>() {
+        if let Ok(peer_id) = pubkey_hex_to_peer_id(&peer_pubkey_hex) {
             let (oneshot_tx, oneshot_rx) = tokio::sync::oneshot::channel();
             let _ = tx
                 .send(NetworkCommand::SendFrame {
