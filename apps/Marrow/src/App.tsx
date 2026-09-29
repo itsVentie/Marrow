@@ -15,11 +15,9 @@ export function App() {
       try {
         await api.initStorage();
 
-        if (typeof api.getIdentity === "function") {
-          const currentId = await api.getIdentity();
-          if (currentId) {
-            identity.value = currentId;
-          }
+        const currentId = await api.getCurrentIdentity();
+        if (currentId) {
+          identity.value = currentId;
         }
       } catch (e) {
         console.warn("Storage init warning:", e);
@@ -49,7 +47,7 @@ export function App() {
   }
 
   if (!identity.value) {
-    return <AuthScreen onAuthenticated={(id) => (identity.value = id)} />;
+    return <AuthScreen onUnlocked={(id: PublicIdentityDto) => (identity.value = id)} />;
   }
 
   if (activeSession.value) {
@@ -64,7 +62,7 @@ export function App() {
   return (
     <DashboardScreen
       identity={identity.value}
-      onSelectSession={(session) => (activeSession.value = session)}
+      onSelectSession={(session: Session) => (activeSession.value = session)}
       onLogout={handleLogout}
     />
   );
