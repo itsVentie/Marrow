@@ -174,7 +174,9 @@ fn buffer_offline_message(offline_buffer: &OfflineBuffer, recipient: PeerId, fra
 
 fn extract_recipient(frame: &Frame) -> Option<PeerId> {
     match frame {
-        Frame::HandshakeInit(HandshakeInitPayload { sender_pubkey, .. }) => Some(*sender_pubkey),
+        Frame::HandshakeInit(payload) => {
+            None 
+        }
         Frame::HandshakeResponse(HandshakeResponsePayload {
             recipient_pubkey, ..
         }) => Some(*recipient_pubkey),
