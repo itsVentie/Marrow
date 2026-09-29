@@ -79,7 +79,7 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
     <div className={styles.container}>
       <header className={styles.header}>
         <div>
-          <h3>Marrow Node</h3>
+          <h3>Marrow</h3>
           <div className={styles.pubkey}>ID: {identity.pubkey_hex.slice(0, 16)}...</div>
         </div>
         <button onClick={handleLogoutClick} className={styles.logoutBtn}>Logout</button>

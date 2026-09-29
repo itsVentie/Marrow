@@ -4,20 +4,60 @@
   height: 100vh;
   background-color: #0f172a;
   color: #f8fafc;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  user-select: none;
+  box-sizing: border-box;
 }
 
 .header {
-  padding: 1rem 2rem;
-  background-color: #1e293b;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background-color: #1e293b;
+  border-bottom: 1px solid #334155;
 }
 
-.myKey {
-  font-size: 0.85rem;
+.header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.pubkey {
+  font-size: 0.75rem;
   color: #94a3b8;
   font-family: monospace;
+  margin-top: 0.2rem;
+}
+
+.logoutBtn {
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background-color: transparent;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.logoutBtn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+.error {
+  margin: 1rem 1.5rem 0 1.5rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  background-color: rgba(127, 29, 29, 0.4);
+  border: 1px solid #991b1b;
+  color: #fca5a5;
+  font-size: 0.85rem;
 }
 
 .grid {
@@ -26,63 +66,142 @@
   gap: 1.5rem;
   padding: 1.5rem;
   flex: 1;
+  overflow: hidden;
 }
 
-.section {
+.panel {
+  display: flex;
+  flex-direction: column;
   background-color: #1e293b;
-  padding: 1rem;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-}
-
-.inlineForm {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.verticalForm {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.input {
-  flex: 1;
-  padding: 0.5rem;
-  border-radius: 4px;
   border: 1px solid #334155;
-  background-color: #0f172a;
-  color: #fff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  overflow: hidden;
 }
 
-.btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  background-color: #3b82f6;
-  color: #fff;
-  cursor: pointer;
+.panel h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
   overflow-y: auto;
+  flex: 1;
+  padding-right: 0.25rem;
 }
 
-.item {
-  padding: 0.75rem;
+.list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.list::-webkit-scrollbar-thumb {
+  background-color: #334155;
+  border-radius: 3px;
+}
+
+.sessionCard,
+.contactCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
   background-color: #0f172a;
-  border-radius: 6px;
+  border: 1px solid #334155;
   cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.05s ease;
 }
 
-.subtext {
+.sessionCard:hover,
+.contactCard:hover {
+  border-color: #3b82f6;
+}
+
+.sessionCard:active {
+  transform: translateY(1px);
+}
+
+.sessionTitle {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #f8fafc;
+}
+
+.peerId {
   font-size: 0.75rem;
   color: #64748b;
   font-family: monospace;
+  margin-top: 0.15rem;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 4px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.deleteBtn:hover {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #334155;
+}
+
+.form input {
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background-color: #0f172a;
+  color: #fff;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.form input:focus {
+  border-color: #3b82f6;
+}
+
+.form button,
+.startBtn {
+  padding: 0.65rem;
+  border-radius: 6px;
+  border: none;
+  background-color: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.form button:hover,
+.startBtn:hover {
+  background-color: #2563eb;
+}
+
+.empty {
+  font-size: 0.85rem;
+  color: #64748b;
+  text-align: center;
+  margin: 1.5rem 0;
 }
