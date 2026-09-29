@@ -5,7 +5,7 @@ use rand_core::OsRng;
 use sha2::Sha256;
 use thiserror::Error;
 use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
-use zeroize::ZeroizeOnDrop;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 pub const X25519_PK_SIZE: usize = 32;
 pub const ML_KEM_PK_SIZE: usize = 1184;
@@ -154,8 +154,36 @@ fn derive_master_secret(
     let hk = Hkdf::<Sha256>::new(Some(b"Marrow-PQC-Hybrid-Handshake-v1"), &ikm);
     let mut okm = [0u8; SHARED_SECRET_SIZE];
 
-    hk.expand(b"master secret", &mut okm)
-        .map_err(|_| HandshakeError::KdfFailed)?;
+    let result = hk
+        .expand(b"master secret", &mut okm)
+        .map_err(|_| HandshakeError::KdfFailed);
 
-    Ok(MasterSecret(okm))
+    ikm.zeroize();
+    result.map(|_| MasterSecret(okm))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_full_pqc_handshake() {
+        let initiator = HandshakeInitiator::new();
+        let init_payload = initiator.generate_init_payload();
+
+        let responder_out = HandshakeResponder::process_init_and_respond(
+            &init_payload.x25519_public,
+            &init_payload.ml_kem_public,
+        )
+        .unwrap();
+
+        let initiator_secret = initiator
+            .process_response(
+                &responder_out.x25519_public,
+                &responder_out.ml_kem_ciphertext,
+            )
+            .unwrap();
+
+        assert_eq!(initiator_secret.0, responder_out.master_secret.0);
+    }
 }
