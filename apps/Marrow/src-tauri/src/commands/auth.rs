@@ -6,7 +6,7 @@ use r_crypto::Identity;
 use r_network::{NetworkEvent, NetworkNode};
 use std::fs;
 use std::path::PathBuf;
-use tauri::State;
+use tauri::{Manager, State};
 
 fn sanitize_filename(name: &str) -> String {
     name.chars()

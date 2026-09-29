@@ -3,7 +3,7 @@ use crate::state::AppState;
 use r_storage::StorageEngine;
 use std::fs;
 use std::path::PathBuf;
-use tauri::State;
+use tauri::{Manager, State};
 
 #[tauri::command]
 pub fn init_storage(app_handle: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
