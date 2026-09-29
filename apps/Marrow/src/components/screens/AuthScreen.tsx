@@ -79,29 +79,37 @@ export function AuthScreen({ onUnlocked }: Props) {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <h2>{isCreateMode.value ? "Create New Vault" : "Unlock Identity"}</h2>
+        <h2 className={styles.title}>
+          {isCreateMode.value ? "Create New Vault" : "Unlock Identity"}
+        </h2>
 
         {error.value && <div className={styles.error}>{error.value}</div>}
 
         {!isCreateMode.value ? (
-          <form onSubmit={handleUnlock}>
-            <div className={styles.field}>
-              <label>Select Key File</label>
-              <select
-                value={selectedFile.value}
-                onChange={(e) => (selectedFile.value = (e.target as HTMLSelectElement).value)}
-              >
-                {keyFiles.value.map((f) => (
-                  <option key={f.path} value={f.path}>
-                    {f.filename}
-                  </option>
-                ))}
-              </select>
+          <form onSubmit={handleUnlock} className={styles.form}>
+            <div className={styles.fieldGroup}>
+              <label className={styles.label}>Select Key File</label>
+              {keyFiles.value.length > 0 ? (
+                <select
+                  className={styles.select}
+                  value={selectedFile.value}
+                  onChange={(e) => (selectedFile.value = (e.target as HTMLSelectElement).value)}
+                >
+                  {keyFiles.value.map((f) => (
+                    <option key={f.path} value={f.path}>
+                      {f.filename}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className={styles.emptyNotice}>No identity keys found in vault directory</div>
+              )}
             </div>
 
-            <div className={styles.field}>
-              <label>Password</label>
+            <div className={styles.fieldGroup}>
+              <label className={styles.label}>Password</label>
               <input
+                className={styles.input}
                 type="password"
                 value={password.value}
                 onInput={(e) => (password.value = (e.target as HTMLInputElement).value)}
@@ -111,16 +119,17 @@ export function AuthScreen({ onUnlocked }: Props) {
             <button
               type="submit"
               disabled={isLoading.value || !selectedFile.value || !password.value}
-              className={styles.primaryBtn}
+              className={styles.button}
             >
               {isLoading.value ? "Unlocking..." : "Unlock"}
             </button>
           </form>
         ) : (
-          <form onSubmit={handleCreate}>
-            <div className={styles.field}>
-              <label>Key Alias (Optional)</label>
+          <form onSubmit={handleCreate} className={styles.form}>
+            <div className={styles.fieldGroup}>
+              <label className={styles.label}>Key Alias (Optional)</label>
               <input
+                className={styles.input}
                 type="text"
                 placeholder="my_device"
                 value={alias.value}
@@ -128,9 +137,10 @@ export function AuthScreen({ onUnlocked }: Props) {
               />
             </div>
 
-            <div className={styles.field}>
-              <label>Set Master Password</label>
+            <div className={styles.fieldGroup}>
+              <label className={styles.label}>Set Master Password</label>
               <input
+                className={styles.input}
                 type="password"
                 value={password.value}
                 onInput={(e) => (password.value = (e.target as HTMLInputElement).value)}
@@ -140,14 +150,14 @@ export function AuthScreen({ onUnlocked }: Props) {
             <button
               type="submit"
               disabled={isLoading.value || !password.value}
-              className={styles.primaryBtn}
+              className={styles.button}
             >
               {isLoading.value ? "Generating..." : "Generate Keypair"}
             </button>
           </form>
         )}
 
-        <button onClick={resetFormState} className={styles.switchBtn}>
+        <button onClick={resetFormState} className={styles.toggleBtn}>
           {isCreateMode.value ? "Already have a key? Unlock" : "Create new identity key"}
         </button>
       </div>
