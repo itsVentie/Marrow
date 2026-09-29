@@ -191,7 +191,7 @@ mod tests {
 
         let decoded_init_frame = Frame::decode(&init_bytes).expect("Failed to decode init frame");
 
-        let (resp_out, responder_secret) = match decoded_init_frame {
+        let (resp_payload, responder_secret) = match decoded_init_frame {
             Frame::HandshakeInit(payload) => {
                 let resp_out = HandshakeResponder::process_init_and_respond(
                     &payload.ephemeral_x25519,
@@ -200,13 +200,13 @@ mod tests {
                 .expect("Failed to process init at responder");
 
                 let secret = resp_out.master_secret.0;
-                (resp_out, secret)
+                let resp_payload = HandshakeResponsePayload::new(responder_identity, &resp_out);
+                (resp_payload, secret)
             }
             _ => panic!("Expected HandshakeInit frame"),
         };
 
-        let resp_frame =
-            Frame::HandshakeResponse(HandshakeResponsePayload::new(responder_identity, &resp_out));
+        let resp_frame = Frame::HandshakeResponse(resp_payload);
         let resp_bytes = resp_frame.encode().expect("Failed to encode resp frame");
 
         let decoded_resp_frame = Frame::decode(&resp_bytes).expect("Failed to decode resp frame");
