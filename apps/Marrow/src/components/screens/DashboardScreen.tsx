@@ -17,6 +17,10 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
   const newContactPubkey = useSignal("");
   const error = useSignal<string | null>(null);
 
+  const showProfileModal = useSignal(false);
+  const showSettingsModal = useSignal(false);
+  const copiedKey = useSignal(false);
+
   const loadData = async () => {
     try {
       const [cList, sList] = await Promise.all([
@@ -75,6 +79,14 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
     onLogout();
   };
 
+  const handleCopyPubkey = () => {
+    navigator.clipboard.writeText(identity.pubkey_hex);
+    copiedKey.value = true;
+    setTimeout(() => {
+      copiedKey.value = false;
+    }, 2000);
+  };
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
@@ -82,13 +94,22 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
           <h3>Marrow</h3>
           <div className={styles.pubkey}>ID: {identity.pubkey_hex.slice(0, 16)}...</div>
         </div>
-        <button onClick={handleLogoutClick} className={styles.logoutBtn}>Logout</button>
+        <div className={styles.headerActions}>
+          <button onClick={() => (showProfileModal.value = true)} className={styles.secondaryBtn}>
+            Profile
+          </button>
+          <button onClick={() => (showSettingsModal.value = true)} className={styles.secondaryBtn}>
+            Settings
+          </button>
+          <button onClick={handleLogoutClick} className={styles.logoutBtn}>
+            Logout
+          </button>
+        </div>
       </header>
 
       {error.value && <div className={styles.error}>{error.value}</div>}
 
       <div className={styles.grid}>
-        {/* Active Sessions Panel */}
         <section className={styles.panel}>
           <h4>Active Sessions</h4>
           <div className={styles.list}>
@@ -114,19 +135,18 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
           </div>
         </section>
 
-        {/* Contacts & Add Panel */}
         <section className={styles.panel}>
           <h4>Add Contact</h4>
           <form onSubmit={handleAddContact} className={styles.form}>
             <input
               placeholder="Alias (e.g. Alice)"
               value={newContactAlias.value}
-              onInput={(e) => newContactAlias.value = (e.target as HTMLInputElement).value}
+              onInput={(e) => (newContactAlias.value = (e.target as HTMLInputElement).value)}
             />
             <input
               placeholder="Public Key Hex"
               value={newContactPubkey.value}
-              onInput={(e) => newContactPubkey.value = (e.target as HTMLInputElement).value}
+              onInput={(e) => (newContactPubkey.value = (e.target as HTMLInputElement).value)}
             />
             <button type="submit">Save Contact</button>
           </form>
@@ -151,6 +171,48 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
           </div>
         </section>
       </div>
+
+      {showProfileModal.value && (
+        <div className={styles.modalOverlay} onClick={() => (showProfileModal.value = false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h4>Identity</h4>
+            <div className={styles.modalField}>
+              <label>Full Public Key (Hex):</label>
+              <textarea readOnly value={identity.pubkey_hex} rows={3} />
+              <button onClick={handleCopyPubkey} className={styles.primaryModalBtn}>
+                {copiedKey.value ? "Copied!" : "Copy Public Key"}
+              </button>
+            </div>
+            <div className={styles.modalInfo}>
+              <p><strong>Crypto Suite:</strong> ML-KEM-768 + X25519</p>
+              <p><strong>Status:</strong> Active & Loaded</p>
+            </div>
+            <button onClick={() => (showProfileModal.value = false)} className={styles.closeModalBtn}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showSettingsModal.value && (
+        <div className={styles.modalOverlay} onClick={() => (showSettingsModal.value = false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h4>Settings</h4>
+            <div className={styles.modalField}>
+              <label>Relay Server Node:</label>
+              <input type="text" placeholder="127.0.0.1:9090" disabled />
+            </div>
+            <div className={styles.modalField}>
+              <label>Local Binding Port:</label>
+              <input type="text" placeholder="0 (Auto-assigned)" disabled />
+            </div>
+            <p className={styles.stubNotice}>Network runtime options can be modified in config.toml</p>
+            <button onClick={() => (showSettingsModal.value = false)} className={styles.closeModalBtn}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

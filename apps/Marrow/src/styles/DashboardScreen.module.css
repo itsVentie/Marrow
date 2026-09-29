@@ -19,6 +19,135 @@
   border-bottom: 1px solid #334155;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.secondaryBtn {
+  padding: 0.5rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background-color: #0f172a;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.secondaryBtn:hover {
+  background-color: #1e293b;
+  border-color: #475569;
+}
+
+/* Modals */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modalContent {
+  width: 420px;
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modalContent h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #f8fafc;
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.modalField label {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.modalField textarea,
+.modalField input {
+  padding: 0.65rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background-color: #0f172a;
+  color: #f8fafc;
+  font-size: 0.8rem;
+  font-family: monospace;
+  resize: none;
+  outline: none;
+}
+
+.modalInfo {
+  background-color: #0f172a;
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.modalInfo p {
+  margin: 0;
+}
+
+.stubNotice {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.primaryModalBtn,
+.closeModalBtn {
+  padding: 0.65rem;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.primaryModalBtn {
+  background-color: #3b82f6;
+  color: #fff;
+}
+
+.primaryModalBtn:hover {
+  background-color: #2563eb;
+}
+
+.closeModalBtn {
+  background-color: #334155;
+  color: #f8fafc;
+}
+
+.closeModalBtn:hover {
+  background-color: #475569;
+}
+
 .header h3 {
   margin: 0;
   font-size: 1.1rem;
