@@ -60,12 +60,20 @@ export function AuthScreen({ onUnlocked }: Props) {
 
     try {
       const identity = await api.createIdentity(password.value, alias.value || undefined);
+      await loadKeys();
       onUnlocked(identity);
     } catch (err: any) {
       error.value = "Failed to create identity: " + String(err);
     } finally {
       isLoading.value = false;
     }
+  };
+
+  const resetFormState = () => {
+    isCreateMode.value = !isCreateMode.value;
+    error.value = null;
+    password.value = "";
+    alias.value = "";
   };
 
   return (
@@ -81,10 +89,12 @@ export function AuthScreen({ onUnlocked }: Props) {
               <label>Select Key File</label>
               <select
                 value={selectedFile.value}
-                onChange={(e) => selectedFile.value = (e.target as HTMLSelectElement).value}
+                onChange={(e) => (selectedFile.value = (e.target as HTMLSelectElement).value)}
               >
                 {keyFiles.value.map((f) => (
-                  <option key={f.path} value={f.path}>{f.filename}</option>
+                  <option key={f.path} value={f.path}>
+                    {f.filename}
+                  </option>
                 ))}
               </select>
             </div>
@@ -94,11 +104,15 @@ export function AuthScreen({ onUnlocked }: Props) {
               <input
                 type="password"
                 value={password.value}
-                onInput={(e) => password.value = (e.target as HTMLInputElement).value}
+                onInput={(e) => (password.value = (e.target as HTMLInputElement).value)}
               />
             </div>
 
-            <button type="submit" disabled={isLoading.value} className={styles.primaryBtn}>
+            <button
+              type="submit"
+              disabled={isLoading.value || !selectedFile.value || !password.value}
+              className={styles.primaryBtn}
+            >
               {isLoading.value ? "Unlocking..." : "Unlock"}
             </button>
           </form>
@@ -110,7 +124,7 @@ export function AuthScreen({ onUnlocked }: Props) {
                 type="text"
                 placeholder="my_device"
                 value={alias.value}
-                onInput={(e) => alias.value = (e.target as HTMLInputElement).value}
+                onInput={(e) => (alias.value = (e.target as HTMLInputElement).value)}
               />
             </div>
 
@@ -119,23 +133,21 @@ export function AuthScreen({ onUnlocked }: Props) {
               <input
                 type="password"
                 value={password.value}
-                onInput={(e) => password.value = (e.target as HTMLInputElement).value}
+                onInput={(e) => (password.value = (e.target as HTMLInputElement).value)}
               />
             </div>
 
-            <button type="submit" disabled={isLoading.value} className={styles.primaryBtn}>
+            <button
+              type="submit"
+              disabled={isLoading.value || !password.value}
+              className={styles.primaryBtn}
+            >
               {isLoading.value ? "Generating..." : "Generate Keypair"}
             </button>
           </form>
         )}
 
-        <button
-          onClick={() => {
-            isCreateMode.value = !isCreateMode.value;
-            error.value = null;
-          }}
-          className={styles.switchBtn}
-        >
+        <button onClick={resetFormState} className={styles.switchBtn}>
           {isCreateMode.value ? "Already have a key? Unlock" : "Create new identity key"}
         </button>
       </div>
