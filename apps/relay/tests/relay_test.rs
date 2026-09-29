@@ -1,7 +1,7 @@
 use r_protocol::{EncryptedMessagePayload, Frame, PADDING_BLOCK_SIZE};
 
 #[tokio::test]
-async fn test_relay_ping_pong_and_routing() {
+async fn test_frame_encoding_and_decoding() {
     let peer_b = [2u8; 32];
 
     let msg_payload = EncryptedMessagePayload {
@@ -17,7 +17,7 @@ async fn test_relay_ping_pong_and_routing() {
     let encoded = frame.encode().expect("Failed to encode frame");
     let decoded = Frame::decode(&encoded).expect("Failed to decode frame");
 
-    assert!(matches!(decoded, Frame::Message(_)));
+    assert_eq!(frame, decoded);
 }
 
 #[tokio::test]
