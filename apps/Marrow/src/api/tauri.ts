@@ -72,6 +72,10 @@ export const api = {
     invoke<DecryptedMessageDto[]>("get_session_messages", {
       sessionId: session_id,
     }),
-  onFrameReceived: (cb: (payload: NetworkEventPayload) => void): Promise<UnlistenFn> =>
-    listen<NetworkEventPayload>("network://frame_received", (e) => cb(e.payload)),
+  
+  onMessageReceived: (cb: (payload: DecryptedMessageDto) => void): Promise<UnlistenFn> =>
+    listen<DecryptedMessageDto>("chat://message_received", (e) => cb(e.payload)),
+    
+  onHolePunchSuccess: (cb: (payload: NetworkEventPayload) => void): Promise<UnlistenFn> =>
+    listen<NetworkEventPayload>("network://hole_punch_success", (e) => cb(e.payload)),
 };

@@ -15,7 +15,12 @@ export function App() {
       try {
         await api.initStorage();
 
-        await api.logoutIdentity();
+        if (typeof api.getIdentity === "function") {
+          const currentId = await api.getIdentity();
+          if (currentId) {
+            identity.value = currentId;
+          }
+        }
       } catch (e) {
         console.warn("Storage init warning:", e);
       } finally {
