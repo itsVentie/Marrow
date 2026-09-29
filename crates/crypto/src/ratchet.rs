@@ -4,6 +4,7 @@ use chacha20poly1305::{
 };
 use hkdf::Hkdf;
 use rand::rngs::OsRng;
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::collections::HashMap;
 use thiserror::Error;
@@ -34,12 +35,20 @@ pub enum RatchetError {
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct SymmetricKey(pub [u8; 32]);
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Header {
-    pub dh_pub: PublicKey,
+    pub dh_pub: [u8; 32],
     pub pn: u32,
     pub n: u32,
 }
 
+impl Header {
+    pub fn public_key(&self) -> PublicKey {
+        PublicKey::from(self.dh_pub)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EncryptedMessage {
     pub header: Header,
     pub ciphertext: Vec<u8>,
@@ -106,8 +115,9 @@ impl DoubleRatchet {
         let (next_cks, mk) = kdf_ck(cks);
         *cks = next_cks;
 
+        let dh_pub_bytes = *PublicKey::from(&self.dhs).as_bytes();
         let header = Header {
-            dh_pub: PublicKey::from(&self.dhs),
+            dh_pub: dh_pub_bytes,
             pn: self.pn,
             n: self.ns,
         };
@@ -120,19 +130,20 @@ impl DoubleRatchet {
 
     pub fn decrypt(&mut self, msg: &EncryptedMessage, ad: &[u8]) -> Result<Vec<u8>, RatchetError> {
         let header_bytes = header_ad(&msg.header, ad);
+        let remote_dh_pub = msg.header.public_key();
 
         if let Some(mk) = self.mkskipped.remove(&SkippedKeyKey {
-            dh_pub: msg.header.dh_pub.to_bytes(),
+            dh_pub: msg.header.dh_pub,
             n: msg.header.n,
         }) {
             return aead_decrypt(&mk, &msg.ciphertext, &header_bytes, msg.header.n);
         }
 
-        self.skip_message_keys(msg.header.dh_pub, msg.header.n)?;
+        self.skip_message_keys(remote_dh_pub, msg.header.n)?;
 
-        if self.dhr.as_ref() != Some(&msg.header.dh_pub) {
+        if self.dhr.as_ref() != Some(&remote_dh_pub) {
             self.skip_message_keys_current_chain(msg.header.pn)?;
-            self.dh_ratchet(msg.header.dh_pub)?;
+            self.dh_ratchet(remote_dh_pub)?;
         }
 
         self.skip_message_keys_current_chain(msg.header.n)?;
@@ -196,7 +207,7 @@ impl DoubleRatchet {
                 }
                 self.mkskipped.insert(
                     SkippedKeyKey {
-                        dh_pub: dhr.to_bytes(),
+                        dh_pub: *dhr.as_bytes(),
                         n: self.nr,
                     },
                     mk,
@@ -232,7 +243,7 @@ fn kdf_ck(ck: &[u8; 32]) -> ([u8; 32], SymmetricKey) {
 
 fn header_ad(header: &Header, ad: &[u8]) -> Vec<u8> {
     let mut res = Vec::with_capacity(32 + 4 + 4 + ad.len());
-    res.extend_from_slice(header.dh_pub.as_bytes());
+    res.extend_from_slice(&header.dh_pub);
     res.extend_from_slice(&header.pn.to_le_bytes());
     res.extend_from_slice(&header.n.to_le_bytes());
     res.extend_from_slice(ad);
