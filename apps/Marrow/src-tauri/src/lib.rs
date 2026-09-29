@@ -1,9 +1,13 @@
 mod state;
 mod tray;
 
-use r_crypto::{x25519_dalek, DoubleRatchet};
+use r_crypto::handshake::{HandshakeInitiator, HandshakeResponder};
+use r_crypto::x25519_dalek;
 use r_crypto::Identity;
 use r_network::{NetworkCommand, NetworkEvent, NetworkNode};
+use r_protocol::{
+    EncryptedMessagePayload, Frame, HandshakeInitPayload, HandshakeResponsePayload,
+};
 use r_storage::{Contact, MessageDirection, Session, StorageEngine, StoredMessage};
 use state::AppState;
 use std::fmt::Display;
@@ -34,8 +38,17 @@ fn derive_network_keypair(identity: &Identity) -> Result<libp2p::identity::Keypa
     let mut secret_bytes = identity.secret_bytes();
     let ed25519_sk = libp2p::identity::ed25519::SecretKey::try_from_bytes(&mut secret_bytes)
         .map_err(|_| "Failed to derive network keypair")?;
-    let keypair = libp2p::identity::Keypair::from(libp2p::identity::ed25519::Keypair::from(ed25519_sk));
+    let keypair =
+        libp2p::identity::Keypair::from(libp2p::identity::ed25519::Keypair::from(ed25519_sk));
     Ok(keypair)
+}
+
+fn parse_peer_pk_array(pubkey_hex: &str) -> Result<[u8; 32], String> {
+    let bytes = hex::decode(pubkey_hex).map_err(map_err_str)?;
+    let array: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| "Public key hex must be 32 bytes".to_string())?;
+    Ok(array)
 }
 
 #[derive(serde::Serialize)]
@@ -177,50 +190,137 @@ fn unlock_identity_from_file(
             while let Some(event) = event_rx.recv().await {
                 match event {
                     NetworkEvent::FrameReceived { peer_id, data } => {
-                        let peer_pk_hex = peer_id.to_string();
+    let peer_pk_hex = peer_id.to_string();
 
-                        if let Ok(encrypted_msg) = bincode::deserialize::<r_crypto::ratchet::EncryptedMessage>(&data) {
-                            let state = handle_clone.state::<AppState>();
+    if let Ok(frame) = Frame::decode(&data) {
+        let state = handle_clone.state::<AppState>();
+
+        match frame {
+            Frame::HandshakeInit(payload) => {
+                let sender_pubkey_hex = hex::encode(payload.sender_pubkey);
+                if let Ok(resp_out) = HandshakeResponder::process_init_and_respond(
+                    &payload.ephemeral_x25519,
+                    &payload.ml_kem_pk,
+                ) {
+                    let my_pubkey = {
+                        let id_guard = state.identity.lock().unwrap();
+                        id_guard.as_ref().map(|i| i.public_hex()).unwrap_or_default()
+                    };
+
+                    if let Ok(my_pk_array) = parse_peer_pk_array(&my_pubkey) {
+                        let peer_x25519_pk = x25519_dalek::PublicKey::from(resp_out.x25519_public);
+                        
+                        {
                             let mut sessions_guard = state.crypto_sessions.lock().unwrap();
+                            sessions_guard.insert(
+                                sender_pubkey_hex.clone(),
+                                state::CryptoSession {
+                                    ratchet: r_crypto::DoubleRatchet::new_ventie(
+                                        resp_out.master_secret.0,
+                                        peer_x25519_pk,
+                                    ),
+                                    peer_pubkey_hex: sender_pubkey_hex.clone(),
+                                    sequence_number: 0,
+                                },
+                            );
+                        } 
 
-                            if let Some(session) = sessions_guard.get_mut(&peer_pk_hex) {
-                                let ad = peer_pk_hex.as_bytes();
-                                if let Ok(plaintext_bytes) = session.ratchet.decrypt(&encrypted_msg, ad) {
-                                    let now = std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap_or_default()
-                                        .as_secs() as i64;
+                        let resp_payload = HandshakeResponsePayload::new(my_pk_array, &resp_out);
+                        let response_frame = Frame::HandshakeResponse(resp_payload);
 
-                                    let stored_msg = StoredMessage {
-                                        session_id: peer_pk_hex.clone(),
-                                        sender_pubkey_hex: peer_pk_hex.clone(),
-                                        ciphertext: plaintext_bytes.clone(),
-                                        timestamp: now,
-                                        direction: MessageDirection::Inbound,
-                                        sequence_number: encrypted_msg.header.n as u64,
-                                    };
+                        if let Ok(encoded_resp) = response_frame.encode_padded() {
+                            let cmd_tx = {
+                                let guard = state.network_cmd.lock().unwrap();
+                                guard.as_ref().cloned()
+                            };
 
-                                    let storage_guard = state.storage.lock().unwrap();
-                                    if let Some(ref storage) = *storage_guard {
-                                        let _ = storage.store_message(&stored_msg);
-                                        let _ = storage.update_session_activity(&peer_pk_hex, now);
-                                    }
-
-                                    let _ = handle_clone.emit(
-                                        "chat://message_received",
-                                        DecryptedMessageDto {
-                                            session_id: peer_pk_hex.clone(),
-                                            sender_pubkey_hex: peer_pk_hex,
-                                            payload_hex: hex::encode(plaintext_bytes),
-                                            timestamp: now,
-                                            direction: MessageDirection::Inbound,
-                                            sequence_number: encrypted_msg.header.n as u64,
-                                        },
-                                    );
+                            if let Some(tx) = cmd_tx {
+                                if let Ok(target_peer_id) = pubkey_hex_to_peer_id(&sender_pubkey_hex) {
+                                    let (oneshot_tx, _) = tokio::sync::oneshot::channel();
+                                    let _ = tx
+                                        .send(NetworkCommand::SendFrame {
+                                            peer_id: target_peer_id,
+                                            data: encoded_resp,
+                                            sender: oneshot_tx,
+                                        })
+                                        .await;
                                 }
                             }
                         }
                     }
+                }
+            }
+            Frame::HandshakeResponse(payload) => {
+                let mut pending_guard = state.pending_handshakes.lock().unwrap();
+                if let Some(initiator) = pending_guard.remove(&peer_pk_hex) {
+                    if let Ok(master_secret) = initiator.process_response(
+                        &payload.ephemeral_x25519,
+                        &payload.ml_kem_ct,
+                    ) {
+                        let peer_x25519_pk = x25519_dalek::PublicKey::from(payload.ephemeral_x25519);
+                        let mut sessions_guard = state.crypto_sessions.lock().unwrap();
+
+                        sessions_guard.insert(
+                            peer_pk_hex.clone(),
+                            state::CryptoSession {
+                                ratchet: r_crypto::DoubleRatchet::new_ventie(
+                                    master_secret.0,
+                                    peer_x25519_pk,
+                                ),
+                                peer_pubkey_hex: peer_pk_hex.clone(),
+                                sequence_number: 0,
+                            },
+                        );
+                    }
+                }
+            }
+            Frame::Message(payload) => {
+                let mut sessions_guard = state.crypto_sessions.lock().unwrap();
+
+                if let Some(session) = sessions_guard.get_mut(&peer_pk_hex) {
+                    let ad = peer_pk_hex.as_bytes();
+
+                    if let Ok(encrypted_msg) = bincode::deserialize::<r_crypto::ratchet::EncryptedMessage>(&payload.ciphertext) {
+                        if let Ok(plaintext_bytes) = session.ratchet.decrypt(&encrypted_msg, ad) {
+                            let now = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs() as i64;
+
+                            let stored_msg = StoredMessage {
+                                session_id: peer_pk_hex.clone(),
+                                sender_pubkey_hex: peer_pk_hex.clone(),
+                                ciphertext: plaintext_bytes.clone(),
+                                timestamp: now,
+                                direction: MessageDirection::Inbound,
+                                sequence_number: encrypted_msg.header.n as u64,
+                            };
+
+                            let storage_guard = state.storage.lock().unwrap();
+                            if let Some(ref storage) = *storage_guard {
+                                let _ = storage.store_message(&stored_msg);
+                                let _ = storage.update_session_activity(&peer_pk_hex, now);
+                            }
+
+                            let _ = handle_clone.emit(
+                                "chat://message_received",
+                                DecryptedMessageDto {
+                                    session_id: peer_pk_hex.clone(),
+                                    sender_pubkey_hex: peer_pk_hex,
+                                    payload_hex: hex::encode(plaintext_bytes),
+                                    timestamp: now,
+                                    direction: MessageDirection::Inbound,
+                                    sequence_number: encrypted_msg.header.n as u64,
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
                     NetworkEvent::HolePunchSuccessful { peer_id } => {
                         let _ = handle_clone.emit(
                             "network://hole_punch_success",
@@ -381,24 +481,55 @@ async fn send_chat_message(
         identity.public_hex()
     };
 
+    let peer_pk_array = parse_peer_pk_array(&peer_pubkey_hex)?;
+
+    let is_session_active = {
+        let sessions_guard = state.crypto_sessions.lock().map_err(map_err_str)?;
+        sessions_guard.contains_key(&session_id)
+    };
+
+    if !is_session_active {
+        let initiator = HandshakeInitiator::new();
+        let init_output = initiator.generate_init_payload();
+
+        let my_pk_array = parse_peer_pk_array(&my_pubkey)?;
+        let init_payload = HandshakeInitPayload::new(my_pk_array, init_output);
+        let init_frame = Frame::HandshakeInit(init_payload);
+
+        let encoded_init = init_frame.encode_padded().map_err(map_err_str)?;
+
+        {
+            let mut pending_guard = state.pending_handshakes.lock().map_err(map_err_str)?;
+            pending_guard.insert(peer_pubkey_hex.clone(), initiator);
+        }
+
+        let cmd_tx = {
+            let guard = state.network_cmd.lock().map_err(map_err_str)?;
+            guard.as_ref().cloned()
+        };
+
+        if let Some(tx) = cmd_tx {
+            if let Ok(peer_id) = pubkey_hex_to_peer_id(&peer_pubkey_hex) {
+                let (oneshot_tx, oneshot_rx) = tokio::sync::oneshot::channel();
+                let _ = tx
+                    .send(NetworkCommand::SendFrame {
+                        peer_id,
+                        data: encoded_init,
+                        sender: oneshot_tx,
+                    })
+                    .await;
+                let _ = oneshot_rx.await;
+            }
+        }
+
+        return Err("PQC Handshake initiated. Please wait for peer response before sending message.".into());
+    }
+
     let (wire_bytes, sequence_number, plaintext_bytes) = {
         let mut sessions_guard = state.crypto_sessions.lock().map_err(map_err_str)?;
-
-        let session = sessions_guard.entry(session_id.clone()).or_insert_with(|| {
-            let shared_key = [42u8; 32];
-            let peer_bytes = hex::decode(&peer_pubkey_hex).unwrap_or_default();
-            let mut arr = [0u8; 32];
-            if peer_bytes.len() == 32 {
-                arr.copy_from_slice(&peer_bytes);
-            }
-            let peer_pk = x25519_dalek::PublicKey::from(arr);
-
-            state::CryptoSession {
-                ratchet: DoubleRatchet::new_ventie(shared_key, peer_pk),
-                peer_pubkey_hex: peer_pubkey_hex.clone(),
-                sequence_number: 0,
-            }
-        });
+        let session = sessions_guard
+            .get_mut(&session_id)
+            .ok_or("Active session not found")?;
 
         let ad = session_id.as_bytes();
         let encrypted_msg = session
@@ -406,11 +537,24 @@ async fn send_chat_message(
             .encrypt(plaintext, ad)
             .map_err(map_err_str)?;
 
-        let serialized_frame = bincode::serialize(&encrypted_msg).map_err(map_err_str)?;
+        let serialized_msg = bincode::serialize(&encrypted_msg).map_err(map_err_str)?;
+
+        let msg_payload = EncryptedMessagePayload {
+            recipient_pubkey: peer_pk_array,
+            dh_pubkey: encrypted_msg.header.dh_pub,
+            sequence_number: encrypted_msg.header.n as u64,
+            previous_chain_length: encrypted_msg.header.pn as u32,
+            nonce: [0u8; 12],
+            ciphertext: serialized_msg,
+        };
+
+        let frame = Frame::Message(msg_payload);
+        let encoded_frame = frame.encode_padded().map_err(map_err_str)?;
+
         let seq = session.sequence_number;
         session.sequence_number += 1;
 
-        (serialized_frame, seq, plaintext.to_vec())
+        (encoded_frame, seq, plaintext.to_vec())
     };
 
     let stored_msg = StoredMessage {
