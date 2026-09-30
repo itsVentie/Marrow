@@ -16,7 +16,7 @@ fn sanitize_filename(name: &str) -> String {
 
 fn derive_db_key(identity: &Identity) -> [u8; 32] {
     let mut key = [0u8; 32];
-    let secret_bytes = identity.secret_key_bytes();
+    let secret_bytes = identity.secret_bytes();
     let len = secret_bytes.len().min(32);
     key[..len].copy_from_slice(&secret_bytes[..len]);
     key

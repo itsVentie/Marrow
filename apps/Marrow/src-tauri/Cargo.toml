@@ -27,3 +27,4 @@ r-crypto = { workspace = true }
 r-protocol = { workspace = true }
 r-storage = { workspace = true }
 r-network = { workspace = true }
+rand.workspace = true
