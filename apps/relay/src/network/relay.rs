@@ -7,7 +7,7 @@ use crate::state::{OfflineBuffer, PeerId};
 
 pub fn extract_recipient(frame: &Frame) -> Option<PeerId> {
     match frame {
-        Frame::HandshakeInit(_payload) => None,
+        Frame::HandshakeInit(payload) => Some(payload.recipient_pubkey),
         Frame::HandshakeResponse(HandshakeResponsePayload {
             recipient_pubkey, ..
         }) => Some(*recipient_pubkey),
