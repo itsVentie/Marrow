@@ -14,6 +14,14 @@ fn sanitize_filename(name: &str) -> String {
         .collect()
 }
 
+fn derive_db_key(identity: &Identity) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    let secret_bytes = identity.secret_key_bytes();
+    let len = secret_bytes.len().min(32);
+    key[..len].copy_from_slice(&secret_bytes[..len]);
+    key
+}
+
 #[tauri::command]
 pub fn list_identity_files(app_handle: tauri::AppHandle) -> Result<Vec<KeyFileInfoDto>, String> {
     let app_dir = app_handle.path().app_data_dir().map_err(map_err_str)?;
@@ -50,13 +58,16 @@ pub fn create_identity(
     app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<PublicIdentityDto, String> {
-    let storage_guard = state.storage.lock().map_err(map_err_str)?;
-    let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
+    let mut storage_guard = state.storage.lock().map_err(map_err_str)?;
+    let storage = storage_guard.as_mut().ok_or("Storage not initialized")?;
 
     let identity = Identity::generate();
     let vault = identity
         .export_encrypted(password.as_bytes())
         .map_err(map_err_str)?;
+
+    let db_key = derive_db_key(&identity);
+    storage.set_encryption_key(db_key);
 
     storage.save_vault(&vault).map_err(map_err_str)?;
 
@@ -95,8 +106,11 @@ pub fn unlock_identity_from_file(
     let identity = Identity::import_encrypted(&vault, password.as_bytes()).map_err(map_err_str)?;
     let pubkey_hex = identity.public_hex();
 
-    let storage_guard = state.storage.lock().map_err(map_err_str)?;
-    if let Some(storage) = storage_guard.as_ref() {
+    let db_key = derive_db_key(&identity);
+
+    let mut storage_guard = state.storage.lock().map_err(map_err_str)?;
+    if let Some(storage) = storage_guard.as_mut() {
+        storage.set_encryption_key(db_key);
         let _ = storage.save_vault(&vault);
     }
 
