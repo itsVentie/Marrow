@@ -12,28 +12,70 @@
 
 ## Security & Architectural Principles
 
-`marrow` is designed with a strict zero-trust philosophy. It operates on isolated cryptographic identities, zero PII requirement, and a memory-safe execution engine.
+Marrow follows a zero-trust security model centered around local
+cryptographic identities and end-to-end encrypted communication.
 
 ### 1. Identity & Cryptography
 
-* **Identity Management:** Ed25519 asymmetric signature scheme (`ed25519-dalek`). Accounts require no email, phone number, or centralized authority; identities are bound strictly to a local 32-byte seed (`identity.key`).
-* **Post-Quantum Key Exchange:** Hybrid **X25519 + ML-KEM-768** (Kyber) key exchange to protect session initialization against "Harvest Now, Decrypt Later" quantum adversary scenarios.
-* **Forward Secrecy:** Full **Double Ratchet Algorithm** implementation. Session keys mutate on every message exchange, invalidating past and future ciphertexts if a single key is compromised.
-* **Authenticated Encryption:** **ChaCha20-Poly1305** AEAD for all payload encryptions, offering superior resistance against side-channel timing attacks without reliance on native AES hardware instructions.
-* **Memory Protection & Zeroization:** Strict zeroization (`zeroize`) on drop for all ephemeral keys, seed states, and raw byte buffers. Critical memory regions containing identity keys and master keys are locked in RAM via OS memory pinning (`mlock` / `VirtualLock`) to prevent page swapping to disk.
+- **Local Identity:** Ed25519-based identities are generated locally and
+  do not require email addresses, phone numbers, or a centralized account
+  provider.
 
-### 2. Networking Layer
+- **Hybrid Key Exchange:** Session establishment uses X25519 together with
+  ML-KEM-768 to provide hybrid classical/post-quantum key agreement.
 
-* **Transport & Resilience:** Native **QUIC** protocol (`quinn`) over UDP, offering 0-RTT session resumption, multi-path connection migration, and built-in TLS 1.3 encryption. Includes an automatic **TCP/TLS** (`tokio-rustls`) fallback transport layer to bypass strict corporate firewalls and aggressive UDP-blocking NAT environments.
-* **Serialization:** Ultra-compact, zero-copy binary framing protocol using `postcard` for low-overhead Rust-to-Rust IPC and network payload serialization.
-* **Blind Relay Architecture:** The server operates as an untrusted, stateless relay. It holds no databases, tracks zero logs, and transiently forwards binary QUIC packets by public key routing. Un-routable messages remain in volatile RAM with a short TTL before absolute eviction.
-* **Traffic Obfuscation:** Active padding to fixed-size binary frames and dummy traffic generation (Poisson distribution) to mitigate Deep Packet Inspection (DPI) and metadata/size analysis.
+- **Forward Secrecy:** One-to-one sessions use a Double Ratchet design to
+  continuously evolve message encryption keys.
 
-### 3. Local Storage Architecture
+- **Authenticated Encryption:** Application payloads are protected using
+  modern AEAD primitives.
 
-* **Embedded Storage:** Zero-dependency embedded KV store (`redb`) operating with ACID guarantees and zero-copy read paths.
-* **Data-At-Rest Protection:** All local database pages are encrypted via **ChaCha20-Poly1305**. Key derivation utilizes **Argon2id** with high memory cost parameters derived from user master authentication.
-* **Local Search Engine:** Embedded full-text search index (`tantivy`) operating over encrypted local stores for sub-millisecond query performance without unencrypting entire message histories to RAM.
+- **Key Hygiene:** Sensitive cryptographic material is explicitly
+  zeroized where supported. OS-level memory locking is planned and is
+  not currently assumed as a universal security guarantee.
+
+### 2. Networking
+
+- **Peer-to-Peer Networking:** The client uses a libp2p-based networking
+  stack with encrypted transports and NAT traversal components.
+
+- **Relay Infrastructure:** Marrow includes an experimental in-memory
+  relay for peer routing and bounded offline delivery.
+
+- **Traffic Metadata:** Fixed-size padding and timing randomization are
+  being developed to reduce metadata leakage. These mechanisms do not
+  currently provide complete protection against traffic analysis.
+
+### 3. Local Storage
+
+- **Encrypted Persistence:** Persistent application records are encrypted
+  before being stored in the local database.
+
+- **Local Search:** Tantivy provides local full-text search. Protecting
+  search indexes at rest is an active security-hardening task.
+
+- **Key Lifecycle:** Storage keys and session state are intended to be
+  destroyed when the application is securely locked or logged out.
+
+### 4. Threat Model
+
+Marrow is designed to reduce exposure to:
+
+- passive network interception;
+- compromised relay infrastructure;
+- local database disclosure;
+- future cryptanalytic attacks against classical key exchange;
+- unauthorized modification of network messages.
+
+Marrow does **not yet claim protection against**:
+
+- a compromised endpoint;
+- a malicious operating system;
+- a fully compromised client runtime;
+- traffic-analysis attacks;
+- a malicious or compromised identity authority;
+- all metadata leakage;
+- physical compromise of an unlocked device.
 
 ---
 
