@@ -247,6 +247,10 @@ Detailed benchmark methodology and historical results will be maintained in
 - [ ] Queue messages while a handshake is in progress.
 - [ ] Securely persist ratchet state.
 - [ ] Recover ratchet state after application restart.
+- [ ] Verify bidirectional session establishment from fresh identities.
+- [ ] Verify messaging after simultaneous session establishment attempts.
+- [ ] Verify ratchet continuity across application restart.
+- [ ] Verify session state consistency after concurrent sends.
 - [ ] Detect and reject stale/replayed messages.
 - [ ] Add message-level authentication failure handling.
 - [ ] Remove duplicated ratchet header fields from the wire protocol.
