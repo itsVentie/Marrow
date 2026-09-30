@@ -157,10 +157,12 @@ pub async fn send_chat_message(
             .map_err(map_err_str)?;
     }
 
-    let search_guard = state.search.lock().map_err(map_err_str)?;
-    if let Some(ref search_index) = *search_guard {
-        let msg_id = format!("{}/{}", canonical_session_id, sequence_number);
-        let _ = search_index.index_message(&msg_id, &canonical_session_id, now as u64, &text);
+    {
+        let search_guard = state.search.lock().map_err(map_err_str)?;
+        if let Some(ref search_index) = *search_guard {
+            let msg_id = format!("{}/{}", canonical_session_id, sequence_number);
+            let _ = search_index.index_message(&msg_id, &canonical_session_id, now as u64, &text);
+        }
     }
 
     let cmd_tx = {

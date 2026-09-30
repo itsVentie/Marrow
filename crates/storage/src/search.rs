@@ -6,6 +6,7 @@ use tantivy::query::QueryParser;
 use tantivy::schema::OwnedValue;
 use tantivy::schema::*;
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
