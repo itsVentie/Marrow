@@ -20,8 +20,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
     match frame {
         Frame::HandshakeInit(payload) => {
             let sender_pubkey_hex = hex::encode(payload.sender_pubkey);
-            let responder_dhs = x25519_dalek::StaticSecret::random_from_rng(&mut rand::rngs::OsRng);
-
+            
             let responder_signing_key = {
                 let id_guard = state.identity.lock().unwrap();
                 match id_guard.as_ref() {
@@ -41,6 +40,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
             if let Ok(resp_out) = HandshakeResponder::process_init_and_respond(
                 &responder_signing_key,
                 &payload.sender_pubkey,
+                &payload.recipient_pubkey,
                 &payload.ephemeral_x25519,
                 &payload.ml_kem_pk,
                 &payload.signature,
@@ -53,7 +53,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                             CryptoSession {
                                 ratchet: r_crypto::DoubleRatchet::init_responder(
                                     resp_out.master_secret.0,
-                                    responder_dhs,
+                                    resp_out.x25519_secret,
                                 ),
                                 peer_pubkey_hex: sender_pubkey_hex.clone(),
                                 sequence_number: 0,
@@ -103,10 +103,15 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
             }
         }
         Frame::HandshakeResponse(payload) => {
-            let mut pending_guard = state.pending_handshakes.lock().unwrap();
-            if let Some(initiator) = pending_guard.remove(&peer_pk_hex) {
+            let responder_pubkey_hex = hex::encode(payload.sender_pubkey);
+            let mut pending_guard =
+               state.pending_handshakes.lock().unwrap();
+
+            if let Some(initiator) =
+                     pending_guard.remove(&responder_pubkey_hex)
                 if let Ok(master_secret) = initiator.process_response(
                     &payload.sender_pubkey,
+                    &payload.recipient_pubkey,
                     &payload.ephemeral_x25519,
                     &payload.ml_kem_ct,
                     &payload.signature,

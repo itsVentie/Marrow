@@ -78,9 +78,12 @@ pub async fn send_chat_message(
             identity.signing_key().clone()
         };
 
-        let initiator = HandshakeInitiator::new();
-        let init_output = initiator.generate_init_payload(&signing_key);
+        let mut initiator = HandshakeInitiator::new();
 
+        let init_output = initiator.generate_init_payload(
+           &signing_key,
+           &peer_pk_array,
+        );
         let my_pk_array = parse_peer_pk_array(&my_pubkey)?;
         let init_payload = HandshakeInitPayload::new(my_pk_array, init_output);
         let init_frame = Frame::HandshakeInit(init_payload);
