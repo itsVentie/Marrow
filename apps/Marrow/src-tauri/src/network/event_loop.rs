@@ -30,16 +30,17 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                 };
 
                 if let Ok(my_pk_array) = parse_peer_pk_array(&my_pubkey) {
-                    let peer_x25519_pk = x25519_dalek::PublicKey::from(resp_out.x25519_public);
+                    let responder_dhs =
+                        x25519_dalek::StaticSecret::from(resp_out.x25519_secret);
 
                     {
                         let mut sessions_guard = state.crypto_sessions.lock().unwrap();
                         sessions_guard.insert(
                             sender_pubkey_hex.clone(),
                             CryptoSession {
-                                ratchet: r_crypto::DoubleRatchet::new_ventie(
+                                ratchet: r_crypto::DoubleRatchet::init_responder(
                                     resp_out.master_secret.0,
-                                    peer_x25519_pk,
+                                    responder_dhs,
                                 ),
                                 peer_pubkey_hex: sender_pubkey_hex.clone(),
                                 sequence_number: 0,
@@ -85,7 +86,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                     sessions_guard.insert(
                         peer_pk_hex.clone(),
                         CryptoSession {
-                            ratchet: r_crypto::DoubleRatchet::new_ventie(
+                            ratchet: r_crypto::DoubleRatchet::init_initiator(
                                 master_secret.0,
                                 peer_x25519_pk,
                             ),
