@@ -484,7 +484,19 @@ Marrow does **not yet claim protection against**:
 
 ## Testing & Quality Assurance
 
-`marrow` features a comprehensive automated test suite across all workspace crates, verifying core cryptography, binary framing, network protocols, and ACID storage persistence, alongside strict static analysis and code formatting rules.
+Marrow currently contains unit and integration tests covering
+cryptographic primitives, protocol serialization, storage persistence,
+and selected networking components.
+
+The project is still missing a complete end-to-end client test covering:
+
+identity creation → authenticated handshake → Double Ratchet →
+network transport → message delivery → decryption → persistence →
+application restart → continued messaging.
+
+Until this path is covered by automated tests, Marrow should be
+considered an experimental prototype rather than a production-ready
+messenger.
 
 ### Local Git Hooks Setup
 
