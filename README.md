@@ -81,16 +81,22 @@ Marrow does **not yet claim protection against**:
 
 ## Tech Stack
 
-| Layer | Technology | Key Characteristics |
+| Layer | Technology | Status |
 | --- | --- | --- |
-| **Frontend UI** | Preact + TypeScript + Vite | ~4KB core footprint, signal-based reactivity, strict typings |
-| **GUI Framework** | Tauri v2 | OS-native WebView wrapper, sandboxed IPC, low RAM overhead (~20-30MB) |
-| **Core Engine** | Rust (2021 Edition) | Memory safety without Garbage Collection, explicit zero-allocation targets |
-| **Networking** | Quinn (QUIC/UDP) + TCP/TLS Fallback | DPI-resistant, multiplexed transport stream with automatic fallback |
-| **Serialization** | `postcard` / `serde` | Compact, no-std capable zero-copy binary framing |
-| **Local Storage** | `redb` + Argon2id | Embedded, fully encrypted, single-file local persistence |
-| **Local Search** | `tantivy` | High-performance embedded full-text indexing engine |
-| **Media & Audio** | Opus (`opus-rs`) / WebRTC (`webrtc-rs`) | Low-latency audio encoding and direct P2P media channels |
+| Frontend | Preact + TypeScript + Vite | Active |
+| Desktop Runtime | Tauri v2 | Active |
+| Core Engine | Rust | Active |
+| P2P Networking | libp2p | Active |
+| QUIC Transport | libp2p QUIC | Active |
+| Relay Server | Quinn | Experimental |
+| Transport Security | libp2p Noise / QUIC TLS | Active |
+| Serialization | Serde + Bincode | Active |
+| Local Storage | redb + XChaCha20-Poly1305 | Active |
+| Local Search | Tantivy | Active, at-rest encryption pending |
+| Identity | Ed25519 | Active |
+| Key Exchange | X25519 + ML-KEM-768 | Active |
+| Session Security | Double Ratchet | Active, integration hardening pending |
+| Audio/Video | WebRTC + Opus | Planned |
 
 ---
 
