@@ -429,7 +429,7 @@ mod tests {
         let responder_secret = responder_output.master_secret.0;
 
         let initiator_secret = initiator.process_response(
-            &responder_output
+            responder_output
                 .signature
                 .as_slice()
                 .get(0..0)
