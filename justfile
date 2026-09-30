@@ -1,3 +1,9 @@
+[unix]
+set shell := ["sh", "-cu"]
+
+[windows]
+set shell := ["powershell.exe", "-NoLogo", "-Command"]
+
 frontend := "apps/Marrow"
 
 install:
