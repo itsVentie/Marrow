@@ -1,10 +1,10 @@
-use crate::dto::DecryptedMessageDto;
+use crate::dto::{DecryptedMessageDto, SearchResultDto};
 use crate::network::{map_err_str, parse_peer_pk_array, pubkey_hex_to_peer_id};
 use crate::state::AppState;
 use r_crypto::handshake::HandshakeInitiator;
 use r_network::NetworkCommand;
 use r_protocol::{EncryptedMessagePayload, Frame, HandshakeInitPayload};
-use r_storage::{MessageDirection, SearchResult, Session, StoredMessage};
+use r_storage::{MessageDirection, Session, StoredMessage};
 use tauri::State;
 
 #[tauri::command]
@@ -226,12 +226,23 @@ pub fn search_messages(
     query: String,
     limit: Option<usize>,
     state: State<'_, AppState>,
-) -> Result<Vec<SearchResult>, String> {
+) -> Result<Vec<SearchResultDto>, String> {
     let search_guard = state.search.lock().map_err(map_err_str)?;
     let search_index = search_guard.as_ref().ok_or("Search index not initialized")?;
 
     let max_results = limit.unwrap_or(20);
-    search_index
+    let raw_results = search_index
         .search(&query, max_results)
-        .map_err(map_err_str)
+        .map_err(map_err_str)?;
+
+    let dto_results = raw_results
+        .into_iter()
+        .map(|r| SearchResultDto {
+            msg_id: r.msg_id,
+            peer_id: r.peer_id,
+            timestamp: r.timestamp,
+        })
+        .collect();
+
+    Ok(dto_results)
 }

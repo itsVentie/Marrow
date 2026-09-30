@@ -1,4 +1,5 @@
 use r_storage::MessageDirection;
+use serde::{Deserialize, Serialize};
 
 #[derive(serde::Serialize)]
 pub struct PublicIdentityDto {
@@ -9,6 +10,13 @@ pub struct PublicIdentityDto {
 pub struct KeyFileInfoDto {
     pub filename: String,
     pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResultDto {
+    pub msg_id: String,
+    pub peer_id: String,
+    pub timestamp: u64,
 }
 
 #[derive(Clone, serde::Serialize)]
