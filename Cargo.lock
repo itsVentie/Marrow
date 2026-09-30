@@ -4761,8 +4761,10 @@ name = "r-protocol"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "ed25519-dalek",
  "hex",
  "r-crypto",
+ "rand 0.8.7",
  "serde",
  "thiserror 2.0.19",
 ]

@@ -1,12 +1,8 @@
 use ed25519_dalek::SigningKey;
-use rand::rngs::OsRng;
 use r_crypto::handshake::{
-    HandshakeError,
-    HandshakeInitiator,
-    HandshakeResponder,
-    InitiatorOutput,
-    ResponderOutput,
+    HandshakeError, HandshakeInitiator, HandshakeResponder, InitiatorOutput, ResponderOutput,
 };
+use rand::rngs::OsRng;
 
 struct HandshakeFixture {
     initiator: HandshakeInitiator,
@@ -25,10 +21,7 @@ fn build_handshake() -> HandshakeFixture {
 
     let mut initiator = HandshakeInitiator::new();
 
-    let init = initiator.generate_init_payload(
-        &initiator_sk,
-        &responder_pubkey,
-    );
+    let init = initiator.generate_init_payload(&initiator_sk, &responder_pubkey);
 
     let response = HandshakeResponder::process_init_and_respond(
         &responder_sk,
@@ -70,8 +63,7 @@ fn test_authenticated_handshake_roundtrip() {
         .expect("Initiator must accept a valid handshake response");
 
     assert_eq!(
-        initiator_secret.0,
-        response.master_secret.0,
+        initiator_secret.0, response.master_secret.0,
         "Initiator and responder must derive the same master secret"
     );
 }
@@ -96,10 +88,7 @@ fn test_wrong_init_recipient_rejected() {
         &init.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::RecipientMismatch)
-    ));
+    assert!(matches!(result, Err(HandshakeError::RecipientMismatch)));
 }
 
 #[test]
@@ -124,10 +113,7 @@ fn test_init_sender_identity_substitution_rejected() {
         &init.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidSignature)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidSignature)));
 }
 
 #[test]
@@ -153,10 +139,7 @@ fn test_init_x25519_tampering_rejected() {
         &init.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidSignature)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidSignature)));
 }
 
 #[test]
@@ -182,10 +165,7 @@ fn test_init_ml_kem_tampering_rejected() {
         &init.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidSignature)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidSignature)));
 }
 
 #[test]
@@ -210,10 +190,7 @@ fn test_init_malformed_ml_kem_key_length_rejected() {
         &init.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidMlKemKeyLength)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidMlKemKeyLength)));
 }
 
 #[test]
@@ -238,10 +215,7 @@ fn test_init_malformed_signature_rejected() {
         malformed_signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidSignature)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidSignature)));
 }
 
 #[test]
@@ -264,17 +238,14 @@ fn test_response_identity_substitution_rejected() {
         &response.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::PeerIdentityMismatch)
-    ));
+    assert!(matches!(result, Err(HandshakeError::PeerIdentityMismatch)));
 }
 
 #[test]
 fn test_response_recipient_substitution_rejected() {
     let HandshakeFixture {
         initiator,
-        init,
+        responder_pubkey,
         response,
         ..
     } = build_handshake();
@@ -282,12 +253,7 @@ fn test_response_recipient_substitution_rejected() {
     let wrong_recipient = [0xA5; 32];
 
     let result = initiator.process_response(
-        &response
-            .x25519_public
-            .as_slice()
-            .get(0..32)
-            .map(|_| [0u8; 32])
-            .unwrap_or(wrong_recipient),
+        &responder_pubkey,
         &wrong_recipient,
         &response.x25519_public,
         &response.ml_kem_ciphertext,
@@ -296,8 +262,7 @@ fn test_response_recipient_substitution_rejected() {
 
     assert!(matches!(
         result,
-        Err(HandshakeError::PeerIdentityMismatch)
-            | Err(HandshakeError::RecipientMismatch)
+        Err(HandshakeError::RecipientMismatch)
     ));
 }
 
@@ -322,10 +287,7 @@ fn test_response_x25519_tampering_rejected() {
         &response.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidSignature)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidSignature)));
 }
 
 #[test]
@@ -349,10 +311,7 @@ fn test_response_ml_kem_ciphertext_tampering_rejected() {
         &response.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidSignature)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidSignature)));
 }
 
 #[test]
@@ -376,10 +335,7 @@ fn test_response_signature_tampering_rejected() {
         &tampered_signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidSignature)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidSignature)));
 }
 
 #[test]
@@ -428,10 +384,7 @@ fn test_response_malformed_signature_rejected() {
         malformed_signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidSignature)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidSignature)));
 }
 
 #[test]
@@ -453,8 +406,5 @@ fn test_invalid_responder_identity_length_rejected() {
         &response.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::InvalidIdentityKey)
-    ));
+    assert!(matches!(result, Err(HandshakeError::InvalidIdentityKey)));
 }

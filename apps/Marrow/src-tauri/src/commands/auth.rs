@@ -29,22 +29,15 @@ fn derive_db_key(identity: &Identity) -> [u8; 32] {
     key
 }
 
-fn ensure_search_index(
-    app_handle: &tauri::AppHandle,
-    state: &AppState,
-) -> Result<(), String> {
-    let app_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(map_err_str)?;
+fn ensure_search_index(app_handle: &tauri::AppHandle, state: &AppState) -> Result<(), String> {
+    let app_dir = app_handle.path().app_data_dir().map_err(map_err_str)?;
 
     let search_path = app_dir.join("search_index");
 
     let mut search_guard = state.search.lock().map_err(map_err_str)?;
 
     if search_guard.is_none() {
-        let search = SearchIndex::open_or_create(search_path)
-            .map_err(map_err_str)?;
+        let search = SearchIndex::open_or_create(search_path).map_err(map_err_str)?;
 
         *search_guard = Some(search);
     }
@@ -53,13 +46,8 @@ fn ensure_search_index(
 }
 
 #[tauri::command]
-pub fn list_identity_files(
-    app_handle: tauri::AppHandle,
-) -> Result<Vec<KeyFileInfoDto>, String> {
-    let app_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(map_err_str)?;
+pub fn list_identity_files(app_handle: tauri::AppHandle) -> Result<Vec<KeyFileInfoDto>, String> {
+    let app_dir = app_handle.path().app_data_dir().map_err(map_err_str)?;
 
     if !app_dir.exists() {
         return Ok(vec![]);
@@ -104,14 +92,9 @@ pub fn create_identity(
 ) -> Result<PublicIdentityDto, String> {
     ensure_search_index(&app_handle, &state)?;
 
-    let mut storage_guard = state
-        .storage
-        .lock()
-        .map_err(map_err_str)?;
+    let mut storage_guard = state.storage.lock().map_err(map_err_str)?;
 
-    let storage = storage_guard
-        .as_mut()
-        .ok_or("Storage not initialized")?;
+    let storage = storage_guard.as_mut().ok_or("Storage not initialized")?;
 
     let identity = Identity::generate();
 
@@ -123,17 +106,12 @@ pub fn create_identity(
 
     storage.set_encryption_key(db_key);
 
-    storage
-        .save_vault(&vault)
-        .map_err(map_err_str)?;
+    storage.save_vault(&vault).map_err(map_err_str)?;
 
     let pubkey_hex = identity.public_hex();
     let short_pubkey = &pubkey_hex[..8];
 
-    let clean_alias = alias
-        .as_deref()
-        .map(sanitize_filename)
-        .unwrap_or_default();
+    let clean_alias = alias.as_deref().map(sanitize_filename).unwrap_or_default();
 
     let filename = if !clean_alias.is_empty() {
         format!("{}.key", clean_alias)
@@ -141,23 +119,15 @@ pub fn create_identity(
         format!("identity_{}.key", short_pubkey)
     };
 
-    let bytes = bincode::serialize(&vault)
-        .map_err(map_err_str)?;
+    let bytes = bincode::serialize(&vault).map_err(map_err_str)?;
 
-    let app_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(map_err_str)?;
+    let app_dir = app_handle.path().app_data_dir().map_err(map_err_str)?;
 
     let file_path = app_dir.join(filename);
 
-    fs::write(&file_path, bytes)
-        .map_err(map_err_str)?;
+    fs::write(&file_path, bytes).map_err(map_err_str)?;
 
-    let mut identity_guard = state
-        .identity
-        .lock()
-        .map_err(map_err_str)?;
+    let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
 
     *identity_guard = Some(identity);
 
@@ -173,35 +143,23 @@ pub fn unlock_identity_from_file(
 ) -> Result<PublicIdentityDto, String> {
     ensure_search_index(&app_handle, &state)?;
 
-    let bytes = fs::read(&file_path)
-        .map_err(map_err_str)?;
+    let bytes = fs::read(&file_path).map_err(map_err_str)?;
 
-    let vault: r_crypto::EncryptedVault =
-        bincode::deserialize(&bytes)
-            .map_err(map_err_str)?;
+    let vault: r_crypto::EncryptedVault = bincode::deserialize(&bytes).map_err(map_err_str)?;
 
-    let identity = Identity::import_encrypted(
-        &vault,
-        password.as_bytes(),
-    )
-    .map_err(map_err_str)?;
+    let identity = Identity::import_encrypted(&vault, password.as_bytes()).map_err(map_err_str)?;
 
     let pubkey_hex = identity.public_hex();
 
     let db_key = derive_db_key(&identity);
 
     {
-        let mut storage_guard = state
-            .storage
-            .lock()
-            .map_err(map_err_str)?;
+        let mut storage_guard = state.storage.lock().map_err(map_err_str)?;
 
         if let Some(storage) = storage_guard.as_mut() {
             storage.set_encryption_key(db_key);
 
-            storage
-                .save_vault(&vault)
-                .map_err(map_err_str)?;
+            storage.save_vault(&vault).map_err(map_err_str)?;
         }
     }
 
@@ -215,42 +173,23 @@ pub fn unlock_identity_from_file(
         tauri::async_runtime::spawn(async move {
             while let Some(event) = event_rx.recv().await {
                 match event {
-                    NetworkEvent::FrameReceived {
-                        peer_id,
-                        data,
-                    } => {
-                        handle_network_frame(
-                            handle_clone.clone(),
-                            peer_id.to_string(),
-                            data,
-                        )
-                        .await;
+                    NetworkEvent::FrameReceived { peer_id, data } => {
+                        handle_network_frame(handle_clone.clone(), peer_id.to_string(), data).await;
                     }
 
-                    NetworkEvent::HolePunchSuccessful {
-                        peer_id,
-                    } => {
-                        handle_hole_punch_success(
-                            handle_clone.clone(),
-                            peer_id.to_string(),
-                        );
+                    NetworkEvent::HolePunchSuccessful { peer_id } => {
+                        handle_hole_punch_success(handle_clone.clone(), peer_id.to_string());
                     }
                 }
             }
         });
 
-        let mut cmd_guard = state
-            .network_cmd
-            .lock()
-            .map_err(map_err_str)?;
+        let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
 
         *cmd_guard = Some(cmd_tx);
     }
 
-    let mut identity_guard = state
-        .identity
-        .lock()
-        .map_err(map_err_str)?;
+    let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
 
     *identity_guard = Some(identity);
 
@@ -279,15 +218,11 @@ pub fn import_identity_file(
         return Err("Invalid identity file name".into());
     }
 
-    let app_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(map_err_str)?;
+    let app_dir = app_handle.path().app_data_dir().map_err(map_err_str)?;
 
     let dest = app_dir.join(format!("{}.key", filename));
 
-    fs::copy(&src, &dest)
-        .map_err(map_err_str)?;
+    fs::copy(&src, &dest).map_err(map_err_str)?;
 
     Ok(KeyFileInfoDto {
         filename,
@@ -299,10 +234,7 @@ pub fn import_identity_file(
 pub fn get_current_identity(
     state: State<'_, AppState>,
 ) -> Result<Option<PublicIdentityDto>, String> {
-    let identity_guard = state
-        .identity
-        .lock()
-        .map_err(map_err_str)?;
+    let identity_guard = state.identity.lock().map_err(map_err_str)?;
 
     Ok(identity_guard.as_ref().map(|id| PublicIdentityDto {
         pubkey_hex: id.public_hex(),
@@ -310,41 +242,27 @@ pub fn get_current_identity(
 }
 
 #[tauri::command]
-pub fn logout_identity(
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub fn logout_identity(state: State<'_, AppState>) -> Result<(), String> {
     {
-        let mut cmd_guard = state
-            .network_cmd
-            .lock()
-            .map_err(map_err_str)?;
+        let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
 
         cmd_guard.take();
     }
 
     {
-        let mut pending_guard = state
-            .pending_handshakes
-            .lock()
-            .map_err(map_err_str)?;
+        let mut pending_guard = state.pending_handshakes.lock().map_err(map_err_str)?;
 
         pending_guard.clear();
     }
 
     {
-        let mut sessions_guard = state
-            .crypto_sessions
-            .lock()
-            .map_err(map_err_str)?;
+        let mut sessions_guard = state.crypto_sessions.lock().map_err(map_err_str)?;
 
         sessions_guard.clear();
     }
 
     {
-        let mut storage_guard = state
-            .storage
-            .lock()
-            .map_err(map_err_str)?;
+        let mut storage_guard = state.storage.lock().map_err(map_err_str)?;
 
         if let Some(storage) = storage_guard.as_mut() {
             storage.clear_encryption_key();
@@ -352,19 +270,13 @@ pub fn logout_identity(
     }
 
     {
-        let mut search_guard = state
-            .search
-            .lock()
-            .map_err(map_err_str)?;
+        let mut search_guard = state.search.lock().map_err(map_err_str)?;
 
         search_guard.take();
     }
 
     {
-        let mut identity_guard = state
-            .identity
-            .lock()
-            .map_err(map_err_str)?;
+        let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
 
         identity_guard.take();
     }

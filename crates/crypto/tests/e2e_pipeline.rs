@@ -2,12 +2,7 @@ use r_crypto::handshake::{HandshakeInitiator, HandshakeResponder};
 use r_crypto::ratchet::DoubleRatchet;
 use r_crypto::x25519_dalek::PublicKey as X25519PublicKey;
 use r_crypto::Identity;
-use r_protocol::{
-    EncryptedMessagePayload,
-    Frame,
-    HandshakeInitPayload,
-    HandshakeResponsePayload,
-};
+use r_protocol::{EncryptedMessagePayload, Frame, HandshakeInitPayload, HandshakeResponsePayload};
 
 #[test]
 fn test_e2e_handshake_frame_and_ratchet_pipeline() {
@@ -21,11 +16,9 @@ fn test_e2e_handshake_frame_and_ratchet_pipeline() {
 
     let ventie_sk = ventie_identity.signing_key();
 
-    let init_out =
-        initiator.generate_init_payload(&ventie_sk, &anek_pubkey);
+    let init_out = initiator.generate_init_payload(&ventie_sk, &anek_pubkey);
 
-    let init_payload =
-        HandshakeInitPayload::new(ventie_pubkey, init_out);
+    let init_payload = HandshakeInitPayload::new(ventie_pubkey, init_out);
 
     let init_frame = Frame::HandshakeInit(init_payload);
 
@@ -34,44 +27,40 @@ fn test_e2e_handshake_frame_and_ratchet_pipeline() {
         .expect("Failed to encode HandshakeInit frame");
 
     let decoded_init_frame =
-        Frame::decode(&encoded_init)
-            .expect("Failed to decode HandshakeInit frame");
+        Frame::decode(&encoded_init).expect("Failed to decode HandshakeInit frame");
 
-    let (resp_payload, responder_secret, responder_dh_secret) =
-        match decoded_init_frame {
-            Frame::HandshakeInit(payload) => {
-                let anek_sk = anek_identity.signing_key();
+    let (resp_payload, responder_secret, responder_dh_secret) = match decoded_init_frame {
+        Frame::HandshakeInit(payload) => {
+            let anek_sk = anek_identity.signing_key();
 
-                let resp_out =
-                    HandshakeResponder::process_init_and_respond(
-                        &anek_sk,
-                        &payload.sender_pubkey,
-                        &payload.recipient_pubkey,
-                        &payload.ephemeral_x25519,
-                        &payload.ml_kem_pk,
-                        &payload.signature,
-                    )
-                    .expect("Failed to process init at responder");
+            let resp_out = HandshakeResponder::process_init_and_respond(
+                &anek_sk,
+                &payload.sender_pubkey,
+                &payload.recipient_pubkey,
+                &payload.ephemeral_x25519,
+                &payload.ml_kem_pk,
+                &payload.signature,
+            )
+            .expect("Failed to process init at responder");
 
-                let responder_secret = resp_out.master_secret.0;
+            let resp_payload = HandshakeResponsePayload::new(
+                anek_pubkey,
+                payload.sender_pubkey,
+                &resp_out,
+            );
 
-                let responder_dh_secret = resp_out.x25519_secret;
+            let responder_secret = resp_out.master_secret.0;
+            let responder_dh_secret = resp_out.x25519_secret;
 
-                let resp_payload = HandshakeResponsePayload::new(
-                    anek_pubkey,
-                    payload.sender_pubkey,
-                    &resp_out,
-                );
+            (
+                resp_payload,
+                responder_secret,
+                responder_dh_secret,
+            )
+        }
 
-                (
-                    resp_payload,
-                    responder_secret,
-                    responder_dh_secret,
-                )
-            }
-
-            _ => panic!("Expected HandshakeInit frame"),
-        };
+        _ => panic!("Expected HandshakeInit frame"),
+    };
 
     let resp_frame = Frame::HandshakeResponse(resp_payload);
 
@@ -80,44 +69,35 @@ fn test_e2e_handshake_frame_and_ratchet_pipeline() {
         .expect("Failed to encode HandshakeResponse frame");
 
     let decoded_resp_frame =
-        Frame::decode(&encoded_resp)
-            .expect("Failed to decode HandshakeResponse frame");
+        Frame::decode(&encoded_resp).expect("Failed to decode HandshakeResponse frame");
 
     let initiator_secret = match decoded_resp_frame {
-        Frame::HandshakeResponse(payload) => initiator
-            .process_response(
-                &payload.sender_pubkey,
-                &payload.recipient_pubkey,
-                &payload.ephemeral_x25519,
-                &payload.ml_kem_ct,
-                &payload.signature,
-            )
-            .expect("Failed to process response at initiator")
-            .0,
+        Frame::HandshakeResponse(payload) => {
+            initiator
+                .process_response(
+                    &payload.sender_pubkey,
+                    &payload.recipient_pubkey,
+                    &payload.ephemeral_x25519,
+                    &payload.ml_kem_ct,
+                    &payload.signature,
+                )
+                .expect("Failed to process response at initiator")
+                .0
+        }
 
         _ => panic!("Expected HandshakeResponse frame"),
     };
 
     assert_eq!(
-        initiator_secret,
-        responder_secret,
+        initiator_secret, responder_secret,
         "Master secrets must match after PQ-hybrid handshake"
     );
 
-    let responder_dh_public =
-        X25519PublicKey::from(&responder_dh_secret);
+    let responder_dh_public = X25519PublicKey::from(&responder_dh_secret);
 
-    let mut ventie_ratchet =
-        DoubleRatchet::init_initiator(
-            initiator_secret,
-            responder_dh_public,
-        );
+    let mut ventie_ratchet = DoubleRatchet::init_initiator(initiator_secret, responder_dh_public);
 
-    let mut anek_ratchet =
-        DoubleRatchet::init_responder(
-            responder_secret,
-            responder_dh_secret,
-        );
+    let mut anek_ratchet = DoubleRatchet::init_responder(responder_secret, responder_dh_secret);
 
     let ad = b"marrow-e2e-v1";
 
@@ -166,8 +146,7 @@ fn test_padded_message_frame_roundtrip() {
     );
 
     let decoded_msg_frame =
-        Frame::decode(&padded_encoded_msg)
-            .expect("Failed to decode padded message frame");
+        Frame::decode(&padded_encoded_msg).expect("Failed to decode padded message frame");
 
     assert_eq!(msg_frame, decoded_msg_frame);
 }
