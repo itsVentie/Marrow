@@ -326,5 +326,3 @@ Notes:
 
 Results without sufficient environment information should be treated as
 informal measurements rather than reproducible benchmark results.
-
-````
