@@ -24,12 +24,24 @@ export function ChatScreen({ session, onBack }: Props) {
   useEffect(() => {
     loadMessages();
 
-    const unlistenPromise = api.onFrameReceived(() => {
-      loadMessages();
-    });
+    let unlisten: (() => void) | undefined;
+
+    const setupListener = async () => {
+      try {
+        unlisten = await api.onMessageReceived(() => {
+          loadMessages();
+        });
+      } catch (err) {
+        console.error("Failed to subscribe to message_received events:", err);
+      }
+    };
+
+    setupListener();
 
     return () => {
-      unlistenPromise.then((unlisten) => unlisten());
+      if (unlisten) {
+        unlisten();
+      }
     };
   }, [session.id]);
 
