@@ -38,6 +38,7 @@ impl HandshakeInitPayload {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct HandshakeResponsePayload {
+    pub sender_pubkey: [u8; 32],
     pub recipient_pubkey: [u8; 32],
     pub ephemeral_x25519: [u8; 32],
     pub ml_kem_ct: Vec<u8>,
@@ -45,8 +46,9 @@ pub struct HandshakeResponsePayload {
 }
 
 impl HandshakeResponsePayload {
-    pub fn new(recipient_pubkey: [u8; 32], resp_output: &ResponderOutput) -> Self {
+    pub fn new(sender_pubkey: [u8; 32], recipient_pubkey: [u8; 32], resp_output: &ResponderOutput) -> Self {
         Self {
+            sender_pubkey,
             recipient_pubkey,
             ephemeral_x25519: resp_output.x25519_public,
             ml_kem_ct: resp_output.ml_kem_ciphertext.clone(),
@@ -214,6 +216,7 @@ mod tests {
                 let secret = resp_out.master_secret.0;
                 let resp_payload = HandshakeResponsePayload::new(
                     *responder_signing_key.verifying_key().as_bytes(),
+                    payload.sender_pubkey,
                     &resp_out,
                 );
                 (resp_payload, secret)
@@ -229,7 +232,7 @@ mod tests {
             Frame::HandshakeResponse(payload) => {
                 initiator
                     .process_response(
-                        responder_signing_key.verifying_key().as_bytes(),
+                        &payload.sender_pubkey,
                         &payload.ephemeral_x25519,
                         &payload.ml_kem_ct,
                         &payload.signature,
@@ -242,3 +245,4 @@ mod tests {
 
         assert_eq!(initiator_secret, responder_secret);
     }
+}

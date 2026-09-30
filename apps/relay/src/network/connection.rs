@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use anyhow::Context;
 use quinn::ServerConfig;
+use std::sync::Arc;
 
 pub fn make_server_config() -> anyhow::Result<ServerConfig> {
     let key_pair = rcgen::KeyPair::generate()?;

@@ -170,7 +170,9 @@ pub fn import_identity_file(
 }
 
 #[tauri::command]
-pub fn get_current_identity(state: State<'_, AppState>) -> Result<Option<PublicIdentityDto>, String> {
+pub fn get_current_identity(
+    state: State<'_, AppState>,
+) -> Result<Option<PublicIdentityDto>, String> {
     let identity_guard = state.identity.lock().map_err(map_err_str)?;
     Ok(identity_guard.as_ref().map(|id| PublicIdentityDto {
         pubkey_hex: id.public_hex(),

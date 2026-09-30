@@ -22,18 +22,29 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
             let sender_pubkey_hex = hex::encode(payload.sender_pubkey);
             let responder_dhs = x25519_dalek::StaticSecret::random_from_rng(&mut rand::rngs::OsRng);
 
+            let responder_signing_key = {
+                let id_guard = state.identity.lock().unwrap();
+                match id_guard.as_ref() {
+                    Some(i) => i.signing_key().clone(),
+                    None => return,
+                }
+            };
+
+            let my_pubkey = {
+                let id_guard = state.identity.lock().unwrap();
+                id_guard
+                    .as_ref()
+                    .map(|i| i.public_hex())
+                    .unwrap_or_default()
+            };
+
             if let Ok(resp_out) = HandshakeResponder::process_init_and_respond(
+                &responder_signing_key,
+                &payload.sender_pubkey,
                 &payload.ephemeral_x25519,
                 &payload.ml_kem_pk,
+                &payload.signature,
             ) {
-                let my_pubkey = {
-                    let id_guard = state.identity.lock().unwrap();
-                    id_guard
-                        .as_ref()
-                        .map(|i| i.public_hex())
-                        .unwrap_or_default()
-                };
-
                 if let Ok(my_pk_array) = parse_peer_pk_array(&my_pubkey) {
                     {
                         let mut sessions_guard = state.crypto_sessions.lock().unwrap();
@@ -62,7 +73,11 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                         }
                     }
 
-                    let resp_payload = HandshakeResponsePayload::new(my_pk_array, &resp_out);
+                    let resp_payload = HandshakeResponsePayload::new(
+                        *responder_signing_key.verifying_key().as_bytes(),
+                        my_pk_array,
+                        &resp_out,
+                    );
                     let response_frame = Frame::HandshakeResponse(resp_payload);
 
                     if let Ok(encoded_resp) = response_frame.encode_padded() {
@@ -90,9 +105,12 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
         Frame::HandshakeResponse(payload) => {
             let mut pending_guard = state.pending_handshakes.lock().unwrap();
             if let Some(initiator) = pending_guard.remove(&peer_pk_hex) {
-                if let Ok(master_secret) =
-                    initiator.process_response(&payload.ephemeral_x25519, &payload.ml_kem_ct)
-                {
+                if let Ok(master_secret) = initiator.process_response(
+                    &payload.sender_pubkey,
+                    &payload.ephemeral_x25519,
+                    &payload.ml_kem_ct,
+                    &payload.signature,
+                ) {
                     let peer_x25519_pk = x25519_dalek::PublicKey::from(payload.ephemeral_x25519);
                     let mut sessions_guard = state.crypto_sessions.lock().unwrap();
 

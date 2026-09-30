@@ -91,10 +91,10 @@ impl HandshakeInitiator {
 
     pub fn process_response(
         self,
-        responder_signing_key_bytes: &[u8; 32],
+        responder_verifying_key_bytes: &[u8],
         responder_x25519_pk_bytes: &[u8; X25519_PK_SIZE],
         ml_kem_ct_bytes: &[u8],
-        responder_signature_bytes: &[u8; ED25519_SIG_SIZE],
+        responder_signature_bytes: &[u8],
     ) -> Result<MasterSecret, HandshakeError> {
         if ml_kem_ct_bytes.len() != ML_KEM_CT_SIZE {
             return Err(HandshakeError::InvalidMlKemCiphertextLength);
@@ -105,9 +105,16 @@ impl HandshakeInitiator {
         transcript.extend_from_slice(responder_x25519_pk_bytes);
         transcript.extend_from_slice(ml_kem_ct_bytes);
 
-        let verifying_key = VerifyingKey::from_bytes(responder_signing_key_bytes)
+        let vk_bytes: &[u8; 32] = responder_verifying_key_bytes
+            .try_into()
             .map_err(|_| HandshakeError::InvalidSignature)?;
-        let signature = Signature::from_bytes(responder_signature_bytes);
+        let verifying_key = VerifyingKey::from_bytes(vk_bytes)
+            .map_err(|_| HandshakeError::InvalidSignature)?;
+
+        let sig_bytes: &[u8; ED25519_SIG_SIZE] = responder_signature_bytes
+            .try_into()
+            .map_err(|_| HandshakeError::InvalidSignature)?;
+        let signature = Signature::from_bytes(sig_bytes);
 
         verifying_key
             .verify(&transcript, &signature)
@@ -144,10 +151,10 @@ pub struct HandshakeResponder;
 impl HandshakeResponder {
     pub fn process_init_and_respond(
         signing_key: &SigningKey,
-        initiator_verifying_key_bytes: &[u8; 32],
+        initiator_verifying_key_bytes: &[u8],
         initiator_x25519_pk_bytes: &[u8; X25519_PK_SIZE],
         initiator_ml_kem_pk_bytes: &[u8],
-        initiator_signature_bytes: &[u8; ED25519_SIG_SIZE],
+        initiator_signature_bytes: &[u8],
     ) -> Result<ResponderOutput, HandshakeError> {
         if initiator_ml_kem_pk_bytes.len() != ML_KEM_PK_SIZE {
             return Err(HandshakeError::InvalidMlKemKeyLength);
@@ -158,9 +165,16 @@ impl HandshakeResponder {
         init_transcript.extend_from_slice(initiator_x25519_pk_bytes);
         init_transcript.extend_from_slice(initiator_ml_kem_pk_bytes);
 
-        let init_verifying_key = VerifyingKey::from_bytes(initiator_verifying_key_bytes)
+        let vk_bytes: &[u8; 32] = initiator_verifying_key_bytes
+            .try_into()
             .map_err(|_| HandshakeError::InvalidSignature)?;
-        let init_signature = Signature::from_bytes(initiator_signature_bytes);
+        let init_verifying_key = VerifyingKey::from_bytes(vk_bytes)
+            .map_err(|_| HandshakeError::InvalidSignature)?;
+
+        let sig_bytes: &[u8; ED25519_SIG_SIZE] = initiator_signature_bytes
+            .try_into()
+            .map_err(|_| HandshakeError::InvalidSignature)?;
+        let init_signature = Signature::from_bytes(sig_bytes);
 
         init_verifying_key
             .verify(&init_transcript, &init_signature)

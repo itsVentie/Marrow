@@ -14,9 +14,9 @@ pub mod handshake;
 pub mod mnemonic;
 pub mod ratchet;
 
-pub use x25519_dalek;
-pub use ratchet::DoubleRatchet;
 pub use mnemonic::MnemonicKey;
+pub use ratchet::DoubleRatchet;
+pub use x25519_dalek;
 
 #[derive(Error, Debug)]
 pub enum CryptoError {

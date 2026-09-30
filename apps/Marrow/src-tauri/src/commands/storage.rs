@@ -6,7 +6,10 @@ use std::path::PathBuf;
 use tauri::{Manager, State};
 
 #[tauri::command]
-pub fn init_storage(app_handle: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+pub fn init_storage(
+    app_handle: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     let mut storage_guard = state.storage.lock().map_err(map_err_str)?;
     if storage_guard.is_some() {
         return Ok(());

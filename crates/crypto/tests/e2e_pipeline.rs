@@ -7,11 +7,12 @@ fn test_e2e_handshake_and_frame_pipeline() {
     let ventie_identity = Identity::generate();
     let anek_identity = Identity::generate();
 
-    let ventie_pubkey = ventie_identity.verifying_key().to_bytes();
-    let anek_pubkey = anek_identity.verifying_key().to_bytes();
+    let ventie_pubkey = *ventie_identity.verifying_key().as_bytes();
+    let anek_pubkey = *anek_identity.verifying_key().as_bytes();
 
     let initiator = HandshakeInitiator::new();
-    let init_out = initiator.generate_init_payload();
+    let ventie_sk = ventie_identity.signing_key();
+    let init_out = initiator.generate_init_payload(&ventie_sk);
 
     let init_payload = HandshakeInitPayload::new(ventie_pubkey, init_out);
     let init_frame = Frame::HandshakeInit(init_payload);
@@ -25,9 +26,13 @@ fn test_e2e_handshake_and_frame_pipeline() {
 
     let (resp_out, responder_secret) = match decoded_init_frame {
         Frame::HandshakeInit(payload) => {
+            let anek_sk = anek_identity.signing_key();
             let resp_out = HandshakeResponder::process_init_and_respond(
+                &anek_sk,
+                &payload.sender_pubkey,
                 &payload.ephemeral_x25519,
                 &payload.ml_kem_pk,
+                &payload.signature,
             )
             .expect("Failed to process init at responder");
 
@@ -37,7 +42,12 @@ fn test_e2e_handshake_and_frame_pipeline() {
         _ => panic!("Expected HandshakeInit frame"),
     };
 
-    let resp_payload = HandshakeResponsePayload::new(anek_pubkey, &resp_out);
+    let anek_sk_resp = anek_identity.signing_key();
+    let resp_payload = HandshakeResponsePayload::new(
+        *anek_sk_resp.verifying_key().as_bytes(),
+        ventie_pubkey,
+        &resp_out,
+    );
     let resp_frame = Frame::HandshakeResponse(resp_payload);
 
     let encoded_resp = resp_frame
@@ -50,7 +60,12 @@ fn test_e2e_handshake_and_frame_pipeline() {
     let initiator_secret = match decoded_resp_frame {
         Frame::HandshakeResponse(payload) => {
             initiator
-                .process_response(&payload.ephemeral_x25519, &payload.ml_kem_ct)
+                .process_response(
+                    &payload.sender_pubkey,
+                    &payload.ephemeral_x25519,
+                    &payload.ml_kem_ct,
+                    &payload.signature,
+                )
                 .expect("Failed to process response at initiator")
                 .0
         }

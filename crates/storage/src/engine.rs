@@ -96,7 +96,8 @@ impl StorageEngine {
     }
 
     pub fn save_contact(&self, contact: &Contact) -> Result<(), StorageError> {
-        let raw_bytes = bincode::serialize(contact).map_err(|_| StorageError::SerializationError)?;
+        let raw_bytes =
+            bincode::serialize(contact).map_err(|_| StorageError::SerializationError)?;
         let encrypted_bytes = self.encrypt_bytes(&raw_bytes)?;
 
         let write_txn = self.db.begin_write()?;
@@ -155,7 +156,8 @@ impl StorageEngine {
             last_activity: now,
         };
 
-        let raw_bytes = bincode::serialize(&session).map_err(|_| StorageError::SerializationError)?;
+        let raw_bytes =
+            bincode::serialize(&session).map_err(|_| StorageError::SerializationError)?;
         let encrypted_bytes = self.encrypt_bytes(&raw_bytes)?;
 
         let write_txn = self.db.begin_write()?;
@@ -184,8 +186,8 @@ impl StorageEngine {
         for entry in table.iter()? {
             let (_k, v) = entry?;
             let decrypted_bytes = self.decrypt_bytes(v.value())?;
-            let session: Session =
-                bincode::deserialize(&decrypted_bytes).map_err(|_| StorageError::SerializationError)?;
+            let session: Session = bincode::deserialize(&decrypted_bytes)
+                .map_err(|_| StorageError::SerializationError)?;
             sessions.push(session);
         }
 
@@ -200,7 +202,8 @@ impl StorageEngine {
         let mut session = self.get_session(session_id)?;
         session.last_activity = timestamp;
 
-        let raw_bytes = bincode::serialize(&session).map_err(|_| StorageError::SerializationError)?;
+        let raw_bytes =
+            bincode::serialize(&session).map_err(|_| StorageError::SerializationError)?;
         let encrypted_bytes = self.encrypt_bytes(&raw_bytes)?;
 
         let write_txn = self.db.begin_write()?;
@@ -251,8 +254,8 @@ impl StorageEngine {
         for entry in table.range(prefix.as_str()..prefix_end.as_str())? {
             let (_k, v) = entry?;
             let decrypted_bytes = self.decrypt_bytes(v.value())?;
-            let msg: StoredMessage =
-                bincode::deserialize(&decrypted_bytes).map_err(|_| StorageError::SerializationError)?;
+            let msg: StoredMessage = bincode::deserialize(&decrypted_bytes)
+                .map_err(|_| StorageError::SerializationError)?;
             messages.push(msg);
         }
 

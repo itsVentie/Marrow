@@ -15,11 +15,14 @@ pub fn pubkey_hex_to_peer_id(pubkey_hex: &str) -> Result<libp2p::PeerId, String>
     Ok(public_key.to_peer_id())
 }
 
-pub fn derive_network_keypair(identity: &r_crypto::Identity) -> Result<libp2p::identity::Keypair, String> {
+pub fn derive_network_keypair(
+    identity: &r_crypto::Identity,
+) -> Result<libp2p::identity::Keypair, String> {
     let mut secret_bytes = identity.secret_bytes();
     let ed25519_sk = libp2p::identity::ed25519::SecretKey::try_from_bytes(&mut secret_bytes)
         .map_err(|_| "Failed to derive network keypair")?;
-    let keypair = libp2p::identity::Keypair::from(libp2p::identity::ed25519::Keypair::from(ed25519_sk));
+    let keypair =
+        libp2p::identity::Keypair::from(libp2p::identity::ed25519::Keypair::from(ed25519_sk));
     Ok(keypair)
 }
 

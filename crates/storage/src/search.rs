@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tantivy::collector::TopDocs;
 use tantivy::directory::error::OpenDirectoryError;
@@ -6,7 +7,6 @@ use tantivy::query::QueryParser;
 use tantivy::schema::OwnedValue;
 use tantivy::schema::*;
 use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]

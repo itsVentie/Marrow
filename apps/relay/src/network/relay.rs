@@ -1,9 +1,7 @@
-use std::time::Instant;
 use bytes::BytesMut;
+use r_protocol::{EncryptedMessagePayload, Frame, HandshakeInitPayload, HandshakeResponsePayload};
+use std::time::Instant;
 use tokio::sync::mpsc;
-use r_protocol::{
-    EncryptedMessagePayload, Frame, HandshakeInitPayload, HandshakeResponsePayload,
-};
 
 use crate::config::MAX_OFFLINE_QUEUE_LEN;
 use crate::state::{OfflineBuffer, PeerId, PeerMap};

@@ -1,17 +1,17 @@
 pub mod connection;
 pub mod relay;
 
-use std::time::Instant;
 use anyhow::Context;
 use quinn::Connection;
 use rand::Rng;
+use std::time::Instant;
 use tokio::sync::mpsc;
 
 use r_protocol::{Frame, HandshakeInitPayload};
 
+use self::relay::{buffer_offline_message, extract_recipient, read_frame_bytes};
 use crate::config::CHANNEL_BUFFER;
 use crate::state::{OfflineBuffer, PeerMap};
-use self::relay::{buffer_offline_message, extract_recipient, read_frame_bytes};
 
 pub async fn handle_connection(
     conn: Connection,

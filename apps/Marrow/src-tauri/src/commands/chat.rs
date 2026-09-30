@@ -72,8 +72,14 @@ pub async fn send_chat_message(
     };
 
     if !is_session_active {
+        let signing_key = {
+            let identity_guard = state.identity.lock().map_err(map_err_str)?;
+            let identity = identity_guard.as_ref().ok_or("Identity not unlocked")?;
+            identity.signing_key().clone()
+        };
+
         let initiator = HandshakeInitiator::new();
-        let init_output = initiator.generate_init_payload();
+        let init_output = initiator.generate_init_payload(&signing_key);
 
         let my_pk_array = parse_peer_pk_array(&my_pubkey)?;
         let init_payload = HandshakeInitPayload::new(my_pk_array, init_output);

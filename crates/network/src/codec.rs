@@ -41,7 +41,11 @@ impl Codec for MarrowCodec {
         Ok(MarrowRequest(buf))
     }
 
-    async fn read_response<T>(&mut self, _: &MarrowProtocol, io: &mut T) -> io::Result<Self::Response>
+    async fn read_response<T>(
+        &mut self,
+        _: &MarrowProtocol,
+        io: &mut T,
+    ) -> io::Result<Self::Response>
     where
         T: AsyncRead + Unpin + Send,
     {
