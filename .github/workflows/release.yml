@@ -5,17 +5,19 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   publish-tauri:
-    permissions:
-      contents: write
+    name: Build ${{ matrix.platform }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'ubuntu-22.04'
+          - platform: ubuntu-22.04
             args: ''
-          - platform: 'windows-latest'
+          - platform: windows-latest
             args: ''
 
     runs-on: ${{ matrix.platform }}
@@ -26,15 +28,17 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
+          cache: pnpm
+          cache-dependency-path: apps/Marrow/pnpm-lock.yaml
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -58,20 +62,19 @@ jobs:
             xdg-utils \
             librsvg2-dev
 
-      - name: Install Frontend Dependencies
-        run: |
-          cd apps/Marrow
-          pnpm install
+      - name: Install frontend dependencies
+        working-directory: apps/Marrow
+        run: pnpm install --frozen-lockfile
 
       - name: Build Tauri Application
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: './apps/Marrow'
+          projectPath: ./apps/Marrow
           tagName: ${{ github.ref_name }}
-          releaseName: 'Marrow ${{ github.ref_name }}'
-          releaseBody: 'See release commit logs for details.'
+          releaseName: Marrow ${{ github.ref_name }}
+          releaseBody: See release commit logs for details.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
