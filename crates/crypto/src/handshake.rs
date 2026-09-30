@@ -4,7 +4,7 @@ use ml_kem::{Ciphertext, EncodedSizeUser, KemCore, MlKem768, MlKem768Params};
 use rand_core::OsRng;
 use sha2::Sha256;
 use thiserror::Error;
-use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
+use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey, StaticSecret};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 pub const X25519_PK_SIZE: usize = 32;
@@ -100,6 +100,7 @@ impl HandshakeInitiator {
 }
 
 pub struct ResponderOutput {
+    pub x25519_secret: StaticSecret,
     pub x25519_public: [u8; X25519_PK_SIZE],
     pub ml_kem_ciphertext: Vec<u8>,
     pub master_secret: MasterSecret,
@@ -116,7 +117,7 @@ impl HandshakeResponder {
             return Err(HandshakeError::InvalidMlKemKeyLength);
         }
 
-        let my_x25519_secret = EphemeralSecret::random_from_rng(OsRng);
+        let my_x25519_secret = StaticSecret::random_from_rng(OsRng);
         let my_x25519_public = X25519PublicKey::from(&my_x25519_secret);
 
         let initiator_x25519_pk = X25519PublicKey::from(*initiator_x25519_pk_bytes);
@@ -136,6 +137,7 @@ impl HandshakeResponder {
             derive_master_secret(x25519_dh_secret.as_bytes(), ml_kem_secret.as_slice())?;
 
         Ok(ResponderOutput {
+            x25519_secret: my_x25519_secret,
             x25519_public: *my_x25519_public.as_bytes(),
             ml_kem_ciphertext: ml_kem_ct.as_slice().to_vec(),
             master_secret,
