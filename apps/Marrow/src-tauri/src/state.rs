@@ -1,15 +1,13 @@
 use r_crypto::handshake::HandshakeInitiator;
-use r_crypto::ratchet::DoubleRatchet;
 use r_crypto::Identity;
 use r_network::NetworkCommand;
 use r_storage::{SearchIndex, StorageEngine};
-use r_storage::StorageEngine;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tokio::sync::mpsc;
 
 pub struct CryptoSession {
-    pub ratchet: DoubleRatchet,
+    pub ratchet: r_crypto::DoubleRatchet,
     pub peer_pubkey_hex: String,
     pub sequence_number: u64,
 }
@@ -27,6 +25,7 @@ impl Default for AppState {
     fn default() -> Self {
         Self {
             storage: Mutex::new(None),
+            search: Mutex::new(None),
             identity: Mutex::new(None),
             network_cmd: Mutex::new(None),
             crypto_sessions: Mutex::new(HashMap::new()),

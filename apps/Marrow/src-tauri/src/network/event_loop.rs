@@ -20,6 +20,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
     match frame {
         Frame::HandshakeInit(payload) => {
             let sender_pubkey_hex = hex::encode(payload.sender_pubkey);
+            let responder_dhs = x25519_dalek::StaticSecret::random_from_rng(&mut rand::rngs::OsRng);
 
             if let Ok(resp_out) = HandshakeResponder::process_init_and_respond(
                 &payload.ephemeral_x25519,
@@ -31,9 +32,6 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                 };
 
                 if let Ok(my_pk_array) = parse_peer_pk_array(&my_pubkey) {
-                    let peer_x25519_pk =
-                        x25519_dalek::PublicKey::from(payload.ephemeral_x25519);
-
                     {
                         let mut sessions_guard = state.crypto_sessions.lock().unwrap();
                         sessions_guard.insert(
@@ -41,7 +39,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                             CryptoSession {
                                 ratchet: r_crypto::DoubleRatchet::init_responder(
                                     resp_out.master_secret.0,
-                                    peer_x25519_pk,
+                                    responder_dhs,
                                 ),
                                 peer_pubkey_hex: sender_pubkey_hex.clone(),
                                 sequence_number: 0,
