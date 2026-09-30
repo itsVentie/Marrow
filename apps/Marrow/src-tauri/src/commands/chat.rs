@@ -43,11 +43,12 @@ pub fn delete_session(session_id: String, state: State<'_, AppState>) -> Result<
 
 #[tauri::command]
 pub async fn send_chat_message(
-    session_id: String,
+    _session_id: String,
     peer_pubkey_hex: String,
     text: String,
     state: State<'_, AppState>,
 ) -> Result<DecryptedMessageDto, String> {
+    let canonical_session_id = peer_pubkey_hex.clone();
     let plaintext = text.as_bytes();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -64,7 +65,7 @@ pub async fn send_chat_message(
 
     let is_session_active = {
         let sessions_guard = state.crypto_sessions.lock().map_err(map_err_str)?;
-        sessions_guard.contains_key(&session_id)
+        sessions_guard.contains_key(&canonical_session_id)
     };
 
     if !is_session_active {
@@ -109,10 +110,10 @@ pub async fn send_chat_message(
     let (wire_bytes, sequence_number, plaintext_bytes) = {
         let mut sessions_guard = state.crypto_sessions.lock().map_err(map_err_str)?;
         let session = sessions_guard
-            .get_mut(&session_id)
+            .get_mut(&canonical_session_id)
             .ok_or("Active session not found")?;
 
-        let ad = session_id.as_bytes();
+        let ad = canonical_session_id.as_bytes();
         let encrypted_msg = session
             .ratchet
             .encrypt(plaintext, ad)
@@ -139,7 +140,7 @@ pub async fn send_chat_message(
     };
 
     let stored_msg = StoredMessage {
-        session_id: session_id.clone(),
+        session_id: canonical_session_id.clone(),
         sender_pubkey_hex: my_pubkey.clone(),
         ciphertext: plaintext_bytes,
         timestamp: now,
@@ -152,7 +153,7 @@ pub async fn send_chat_message(
         let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
         storage.store_message(&stored_msg).map_err(map_err_str)?;
         storage
-            .update_session_activity(&session_id, now)
+            .update_session_activity(&canonical_session_id, now)
             .map_err(map_err_str)?;
     }
 
@@ -176,7 +177,7 @@ pub async fn send_chat_message(
     }
 
     Ok(DecryptedMessageDto {
-        session_id,
+        session_id: canonical_session_id,
         sender_pubkey_hex: my_pubkey,
         payload_hex: hex::encode(plaintext),
         timestamp: now,
