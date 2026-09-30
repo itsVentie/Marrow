@@ -4,7 +4,9 @@ mod network;
 mod state;
 mod tray;
 
+use r_storage::{SearchIndex, StorageEngine};
 use state::AppState;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,6 +14,28 @@ pub fn run() {
         .manage(AppState::default())
         .setup(|app| {
             tray::create_tray(app.handle())?;
+
+            if let Ok(app_dir) = app.path().app_data_dir() {
+                let _ = std::fs::create_dir_all(&app_dir);
+
+                let db_path = app_dir.join("marrow.redb");
+                let search_path = app_dir.join("search_index");
+
+                if let Ok(storage) = StorageEngine::open(&db_path) {
+                    let state = app.state::<AppState>();
+                    if let Ok(mut storage_guard) = state.storage.lock() {
+                        *storage_guard = Some(storage);
+                    }
+                }
+
+                if let Ok(search) = SearchIndex::open_or_create(&search_path) {
+                    let state = app.state::<AppState>();
+                    if let Ok(mut search_guard) = state.search.lock() {
+                        *search_guard = Some(search);
+                    }
+                }
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -36,6 +60,7 @@ pub fn run() {
             commands::delete_session,
             commands::send_chat_message,
             commands::get_session_messages,
+            commands::search_messages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

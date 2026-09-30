@@ -4,7 +4,7 @@ use crate::state::AppState;
 use r_crypto::handshake::HandshakeInitiator;
 use r_network::NetworkCommand;
 use r_protocol::{EncryptedMessagePayload, Frame, HandshakeInitPayload};
-use r_storage::{MessageDirection, Session, StoredMessage};
+use r_storage::{MessageDirection, SearchResult, Session, StoredMessage};
 use tauri::State;
 
 #[tauri::command]
@@ -142,7 +142,7 @@ pub async fn send_chat_message(
     let stored_msg = StoredMessage {
         session_id: canonical_session_id.clone(),
         sender_pubkey_hex: my_pubkey.clone(),
-        ciphertext: plaintext_bytes,
+        ciphertext: plaintext_bytes.clone(),
         timestamp: now,
         direction: MessageDirection::Outbound,
         sequence_number,
@@ -155,6 +155,12 @@ pub async fn send_chat_message(
         storage
             .update_session_activity(&canonical_session_id, now)
             .map_err(map_err_str)?;
+    }
+
+    let search_guard = state.search.lock().map_err(map_err_str)?;
+    if let Some(ref search_index) = *search_guard {
+        let msg_id = format!("{}/{}", canonical_session_id, sequence_number);
+        let _ = search_index.index_message(&msg_id, &canonical_session_id, now as u64, &text);
     }
 
     let cmd_tx = {
@@ -211,4 +217,19 @@ pub fn get_session_messages(
         .collect();
 
     Ok(result)
+}
+
+#[tauri::command]
+pub fn search_messages(
+    query: String,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<SearchResult>, String> {
+    let search_guard = state.search.lock().map_err(map_err_str)?;
+    let search_index = search_guard.as_ref().ok_or("Search index not initialized")?;
+
+    let max_results = limit.unwrap_or(20);
+    search_index
+        .search(&query, max_results)
+        .map_err(map_err_str)
 }
