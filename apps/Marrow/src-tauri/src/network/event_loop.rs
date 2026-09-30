@@ -20,7 +20,10 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
     match frame {
         Frame::HandshakeInit(payload) => {
             let sender_pubkey_hex = hex::encode(payload.sender_pubkey);
+            let responder_dhs = x25519_dalek::StaticSecret::random_from_rng(&mut rand::rngs::OsRng);
+
             if let Ok(resp_out) = HandshakeResponder::process_init_and_respond(
+                &responder_dhs,
                 &payload.ephemeral_x25519,
                 &payload.ml_kem_pk,
             ) {
@@ -30,9 +33,6 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                 };
 
                 if let Ok(my_pk_array) = parse_peer_pk_array(&my_pubkey) {
-                    let responder_dhs =
-                        x25519_dalek::StaticSecret::from(resp_out.x25519_secret);
-
                     {
                         let mut sessions_guard = state.crypto_sessions.lock().unwrap();
                         sessions_guard.insert(
@@ -134,19 +134,34 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                             .unwrap_or_default()
                             .as_secs() as i64;
 
+                        let sequence_number = encrypted_msg.header.n as u64;
+                        let msg_id = format!("{}/{}", peer_pk_hex, sequence_number);
+
                         let stored_msg = StoredMessage {
                             session_id: peer_pk_hex.clone(),
                             sender_pubkey_hex: peer_pk_hex.clone(),
                             ciphertext: plaintext_bytes.clone(),
                             timestamp: now,
                             direction: MessageDirection::Inbound,
-                            sequence_number: encrypted_msg.header.n as u64,
+                            sequence_number,
                         };
 
                         let storage_guard = state.storage.lock().unwrap();
                         if let Some(ref storage) = *storage_guard {
                             let _ = storage.store_message(&stored_msg);
                             let _ = storage.update_session_activity(&peer_pk_hex, now);
+                        }
+
+                        let search_guard = state.search.lock().unwrap();
+                        if let Some(ref search_index) = *search_guard {
+                            if let Ok(text_content) = String::from_utf8(plaintext_bytes.clone()) {
+                                let _ = search_index.index_message(
+                                    &msg_id,
+                                    &peer_pk_hex,
+                                    now as u64,
+                                    &text_content,
+                                );
+                            }
                         }
 
                         let _ = handle.emit(
@@ -157,7 +172,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                                 payload_hex: hex::encode(plaintext_bytes),
                                 timestamp: now,
                                 direction: MessageDirection::Inbound,
-                                sequence_number: encrypted_msg.header.n as u64,
+                                sequence_number,
                             },
                         );
                     }
