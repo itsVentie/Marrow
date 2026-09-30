@@ -594,32 +594,106 @@ cargo test --workspace
 
 ### Prerequisites
 
-* **Rust**: `1.78.0` or newer
-* **Node.js**: `v20+` & `pnpm`
-* **Tauri CLI**: `v2.x`
+- **Rust:** `1.78.0` or newer
+- **Node.js:** `v20+`
+- **pnpm:** required for the frontend workspace
+- **Tauri CLI:** `v2.x`
+- **Git:** required for cloning the repository
 
-### Quick Start
+Platform-specific Tauri dependencies may also be required. See the
+[Tauri prerequisites documentation](https://v2.tauri.app/start/prerequisites/)
+for the required system packages for your operating system.
 
-1. Install frontend dependencies:
+### Clone the Repository
 
 ```bash
-cd apps/marrow
-pnpm install
+git clone https://github.com/itsVentie/Marrow.git
+cd Marrow
+````
 
+### Install Frontend Dependencies
+
+```bash
+cd apps/Marrow
+pnpm install
 ```
 
-2. Run application in dev mode:
+### Development
+
+Run the Tauri desktop application in development mode:
 
 ```bash
 pnpm tauri dev
-
 ```
 
-3. Build production release:
+### Production Build
+
+Build the application using Tauri's production build pipeline:
 
 ```bash
 pnpm tauri build
+```
 
+The generated release artifacts are placed in the Tauri build output
+directory under:
+
+```text
+apps/Marrow/src-tauri/target/release/bundle/
+```
+
+The exact artifact format depends on the target operating system.
+
+### Rust Checks
+
+From the repository root:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace -- -D warnings
+cargo test --workspace
+```
+
+### Frontend Checks
+
+From `apps/Marrow`:
+
+```bash
+pnpm install
+pnpm build
+```
+
+### Git Hooks
+
+Marrow includes versioned Git hooks for local development. Enable them with:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This enables the repository's configured pre-commit checks.
+
+### Troubleshooting
+
+If the Tauri build fails because of missing system dependencies, verify that
+the platform-specific prerequisites listed in the Tauri documentation are
+installed.
+
+If Rust dependencies or generated build artifacts become inconsistent, clean
+the workspace and rebuild:
+
+```bash
+cargo clean
+pnpm tauri build
+```
+
+For development issues, check the Rust, Node.js, pnpm, and Tauri CLI versions:
+
+```bash
+rustc --version
+cargo --version
+node --version
+pnpm --version
+cargo tauri --version
 ```
 
 ---
