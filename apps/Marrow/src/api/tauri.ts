@@ -32,6 +32,12 @@ export interface DecryptedMessageDto {
   sequence_number: number;
 }
 
+export interface SearchResultDto {
+  msg_id: string;
+  peer_id: string;
+  timestamp: number;
+}
+
 export interface NetworkEventPayload {
   peer_id: string;
   data_hex?: string;
@@ -72,10 +78,12 @@ export const api = {
     invoke<DecryptedMessageDto[]>("get_session_messages", {
       sessionId: session_id,
     }),
-  
+  searchMessages: (query: string, limit?: number) =>
+    invoke<SearchResultDto[]>("search_messages", { query, limit }),
+
   onMessageReceived: (cb: (payload: DecryptedMessageDto) => void): Promise<UnlistenFn> =>
     listen<DecryptedMessageDto>("chat://message_received", (e) => cb(e.payload)),
-    
+
   onHolePunchSuccess: (cb: (payload: NetworkEventPayload) => void): Promise<UnlistenFn> =>
     listen<NetworkEventPayload>("network://hole_punch_success", (e) => cb(e.payload)),
 };
