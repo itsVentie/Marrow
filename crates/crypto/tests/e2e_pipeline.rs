@@ -1,4 +1,6 @@
 use r_crypto::handshake::{HandshakeInitiator, HandshakeResponder};
+use r_crypto::ratchet::DoubleRatchet;
+use r_crypto::x25519_dalek::PublicKey as X25519PublicKey;
 use r_crypto::Identity;
 use r_protocol::{
     EncryptedMessagePayload,
@@ -8,7 +10,7 @@ use r_protocol::{
 };
 
 #[test]
-fn test_e2e_handshake_and_frame_pipeline() {
+fn test_e2e_handshake_frame_and_ratchet_pipeline() {
     let ventie_identity = Identity::generate();
     let anek_identity = Identity::generate();
 
@@ -35,34 +37,41 @@ fn test_e2e_handshake_and_frame_pipeline() {
         Frame::decode(&encoded_init)
             .expect("Failed to decode HandshakeInit frame");
 
-    let (resp_payload, responder_secret) = match decoded_init_frame {
-        Frame::HandshakeInit(payload) => {
-            let anek_sk = anek_identity.signing_key();
+    let (resp_payload, responder_secret, responder_dh_secret) =
+        match decoded_init_frame {
+            Frame::HandshakeInit(payload) => {
+                let anek_sk = anek_identity.signing_key();
 
-            let resp_out =
-                HandshakeResponder::process_init_and_respond(
-                    &anek_sk,
-                    &payload.sender_pubkey,
-                    &payload.recipient_pubkey,
-                    &payload.ephemeral_x25519,
-                    &payload.ml_kem_pk,
-                    &payload.signature,
+                let resp_out =
+                    HandshakeResponder::process_init_and_respond(
+                        &anek_sk,
+                        &payload.sender_pubkey,
+                        &payload.recipient_pubkey,
+                        &payload.ephemeral_x25519,
+                        &payload.ml_kem_pk,
+                        &payload.signature,
+                    )
+                    .expect("Failed to process init at responder");
+
+                let responder_secret = resp_out.master_secret.0;
+
+                let responder_dh_secret = resp_out.x25519_secret;
+
+                let resp_payload = HandshakeResponsePayload::new(
+                    anek_pubkey,
+                    payload.sender_pubkey,
+                    &resp_out,
+                );
+
+                (
+                    resp_payload,
+                    responder_secret,
+                    responder_dh_secret,
                 )
-                .expect("Failed to process init at responder");
+            }
 
-            let secret = resp_out.master_secret.0;
-
-            let resp_payload = HandshakeResponsePayload::new(
-                anek_pubkey,
-                payload.sender_pubkey,
-                &resp_out,
-            );
-
-            (resp_payload, secret)
-        }
-
-        _ => panic!("Expected HandshakeInit frame"),
-    };
+            _ => panic!("Expected HandshakeInit frame"),
+        };
 
     let resp_frame = Frame::HandshakeResponse(resp_payload);
 
@@ -95,8 +104,48 @@ fn test_e2e_handshake_and_frame_pipeline() {
         "Master secrets must match after PQ-hybrid handshake"
     );
 
+    let responder_dh_public =
+        X25519PublicKey::from(&responder_dh_secret);
+
+    let mut ventie_ratchet =
+        DoubleRatchet::init_initiator(
+            initiator_secret,
+            responder_dh_public,
+        );
+
+    let mut anek_ratchet =
+        DoubleRatchet::init_responder(
+            responder_secret,
+            responder_dh_secret,
+        );
+
+    let ad = b"marrow-e2e-v1";
+
+    let encrypted_from_ventie = ventie_ratchet
+        .encrypt(b"Hello Anek", ad)
+        .expect("Ventie's ratchet encryption failed");
+
+    let decrypted_by_anek = anek_ratchet
+        .decrypt(&encrypted_from_ventie, ad)
+        .expect("Anek failed to decrypt Ventie's message");
+
+    assert_eq!(decrypted_by_anek, b"Hello Anek");
+
+    let encrypted_from_anek = anek_ratchet
+        .encrypt(b"Hello Ventie", ad)
+        .expect("Anek's ratchet encryption failed");
+
+    let decrypted_by_ventie = ventie_ratchet
+        .decrypt(&encrypted_from_anek, ad)
+        .expect("Ventie failed to decrypt Anek's message");
+
+    assert_eq!(decrypted_by_ventie, b"Hello Ventie");
+}
+
+#[test]
+fn test_padded_message_frame_roundtrip() {
     let msg_payload = EncryptedMessagePayload {
-        recipient_pubkey: anek_pubkey,
+        recipient_pubkey: [0xAA; 32],
         dh_pubkey: [0x42; 32],
         sequence_number: 1,
         previous_chain_length: 0,
@@ -109,6 +158,12 @@ fn test_e2e_handshake_and_frame_pipeline() {
     let padded_encoded_msg = msg_frame
         .encode_padded()
         .expect("Failed to encode padded message frame");
+
+    assert_eq!(
+        padded_encoded_msg.len() % 256,
+        0,
+        "Padded frames must align to 256-byte blocks"
+    );
 
     let decoded_msg_frame =
         Frame::decode(&padded_encoded_msg)
