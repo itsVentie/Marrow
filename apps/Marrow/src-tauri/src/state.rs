@@ -2,6 +2,7 @@ use r_crypto::handshake::HandshakeInitiator;
 use r_crypto::ratchet::DoubleRatchet;
 use r_crypto::Identity;
 use r_network::NetworkCommand;
+use r_storage::{SearchIndex, StorageEngine};
 use r_storage::StorageEngine;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -15,6 +16,7 @@ pub struct CryptoSession {
 
 pub struct AppState {
     pub storage: Mutex<Option<StorageEngine>>,
+    pub search: Mutex<Option<SearchIndex>>,
     pub identity: Mutex<Option<Identity>>,
     pub network_cmd: Mutex<Option<mpsc::Sender<NetworkCommand>>>,
     pub crypto_sessions: Mutex<HashMap<String, CryptoSession>>,
