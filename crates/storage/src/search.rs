@@ -77,7 +77,7 @@ impl SearchIndex {
         timestamp: u64,
         content: &str,
     ) -> Result<(), SearchError> {
-        let mut writer: IndexWriter = self.index.writer(50_000_000)?;
+        let mut writer: IndexWriter = self.index.writer(5_000_000)?;
         let mut doc = TantivyDocument::default();
         doc.add_text(self.msg_id_field, msg_id);
         doc.add_text(self.peer_id_field, peer_id);
