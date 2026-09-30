@@ -20,15 +20,20 @@ pub enum ProtocolError {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct HandshakeInitPayload {
     pub sender_pubkey: [u8; 32],
+    pub recipient_pubkey: [u8; 32],
     pub ephemeral_x25519: [u8; 32],
     pub ml_kem_pk: Vec<u8>,
     pub signature: Vec<u8>,
 }
 
 impl HandshakeInitPayload {
-    pub fn new(sender_pubkey: [u8; 32], init_output: InitiatorOutput) -> Self {
+    pub fn new(
+        sender_pubkey: [u8; 32],
+        init_output: InitiatorOutput,
+    ) -> Self {
         Self {
             sender_pubkey,
+            recipient_pubkey: init_output.recipient_pubkey,
             ephemeral_x25519: init_output.x25519_public,
             ml_kem_pk: init_output.ml_kem_public,
             signature: init_output.signature.to_vec(),
@@ -46,7 +51,11 @@ pub struct HandshakeResponsePayload {
 }
 
 impl HandshakeResponsePayload {
-    pub fn new(sender_pubkey: [u8; 32], recipient_pubkey: [u8; 32], resp_output: &ResponderOutput) -> Self {
+    pub fn new(
+        sender_pubkey: [u8; 32],
+        recipient_pubkey: [u8; 32],
+        resp_output: &ResponderOutput,
+    ) -> Self {
         Self {
             sender_pubkey,
             recipient_pubkey,
