@@ -4,7 +4,6 @@ pub mod relay;
 use anyhow::Context;
 use quinn::Connection;
 use rand::Rng;
-use std::time::Instant;
 use tokio::sync::mpsc;
 
 use r_protocol::{Frame, HandshakeInitPayload};

@@ -158,7 +158,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
 
                         let stored_msg = StoredMessage {
                             session_id: peer_pk_hex.clone(),
-                            sender_pubkey_hex: peer_pk_hex.clone(),
+                            sender_pubkey_hex: session.peer_pubkey_hex.clone(),
                             ciphertext: plaintext_bytes.clone(),
                             timestamp: now,
                             direction: MessageDirection::Inbound,

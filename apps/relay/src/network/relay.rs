@@ -1,10 +1,9 @@
 use bytes::BytesMut;
-use r_protocol::{EncryptedMessagePayload, Frame, HandshakeInitPayload, HandshakeResponsePayload};
+use r_protocol::{EncryptedMessagePayload, Frame, HandshakeResponsePayload};
 use std::time::Instant;
-use tokio::sync::mpsc;
 
 use crate::config::MAX_OFFLINE_QUEUE_LEN;
-use crate::state::{OfflineBuffer, PeerId, PeerMap};
+use crate::state::{OfflineBuffer, PeerId};
 
 pub fn extract_recipient(frame: &Frame) -> Option<PeerId> {
     match frame {
