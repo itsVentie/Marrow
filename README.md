@@ -361,6 +361,21 @@ Marrow does **not yet claim protection against**:
 - [ ] Publish reproducible security test results.
 - [ ] Perform an independent cryptographic/security review before
       production security claims.
+- [ ] Establish reproducible benchmark environment.
+- [ ] Add `criterion` benchmarks for cryptographic operations.
+- [ ] Benchmark X25519 key agreement.
+- [ ] Benchmark ML-KEM-768 encapsulation/decapsulation.
+- [ ] Benchmark Ed25519 signing/verification.
+- [ ] Benchmark AEAD encryption/decryption.
+- [ ] Benchmark Double Ratchet message processing.
+- [ ] Benchmark encrypted storage reads/writes.
+- [ ] Benchmark Tantivy indexing/search.
+- [ ] Benchmark relay throughput.
+- [ ] Benchmark relay memory consumption per connected peer.
+- [ ] Benchmark message delivery latency.
+- [ ] Benchmark handshake latency.
+- [ ] Publish benchmark methodology and hardware/software environment.
+- [ ] Track benchmark regressions in CI.
 
 </details>
 
