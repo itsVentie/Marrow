@@ -100,6 +100,46 @@ Marrow does **not yet claim protection against**:
 
 ---
 
+## Project Status & Engineering Metrics
+
+> **Status:** Experimental prototype  
+> **Production readiness:** Not yet claimed  
+> **Last reviewed:** YYYY-MM-DD
+
+| Area | Status | Current state |
+| --- | --- | --- |
+| Core Rust architecture | 🟢 Active | Modular workspace with separated crypto, protocol, storage, and networking crates |
+| Identity & cryptography | 🟡 Hardening | Ed25519, X25519, ML-KEM-768, XChaCha20-Poly1305 implemented |
+| Hybrid handshake | 🟡 Hardening | Hybrid primitives and session construction implemented; authentication and transcript binding pending |
+| Double Ratchet | 🟡 Integration | Ratchet primitives implemented; complete application-level integration pending |
+| Local storage | 🟡 Hardening | Encrypted records implemented; search-index protection and key lifecycle hardening pending |
+| P2P networking | 🟡 Experimental | libp2p TCP/QUIC stack implemented; relay architecture still under development |
+| Desktop client | 🟡 Incomplete | Core application flow exists; several UI components remain unfinished |
+| End-to-end verification | 🔴 Incomplete | Full Alice → Bob application-level E2E path is not yet covered |
+| Traffic-analysis resistance | 🔴 Experimental | Padding and jitter exist; effectiveness has not yet been independently evaluated |
+| External security review | ⚪ Not performed | No independent cryptographic/security audit has been completed |
+
+### Current Verification Metrics
+
+| Metric | Value | Verification |
+| --- | ---: | --- |
+| Rust tests | TBD | `cargo test --workspace` |
+| Frontend typecheck | TBD | CI |
+| Frontend production build | TBD | CI |
+| Full application E2E tests | 0 | Planned |
+| Fuzz targets | 0 | Planned |
+| Independent security audits | 0 | Not yet performed |
+| Published performance benchmarks | 0 | Planned |
+
+> Metrics are only published when they are reproducible from a documented command,
+> benchmark, or CI workflow. Unverified performance or security claims are intentionally
+> omitted.
+
+Detailed benchmark methodology and historical results will be maintained in
+`docs/benchmarks/`.
+
+---
+
 ## Roadmap
 
 > Roadmap status reflects the actual implementation state of the repository.
@@ -167,10 +207,10 @@ Marrow does **not yet claim protection against**:
 
 - [x] X25519 + ML-KEM-768 hybrid key exchange primitives.
 - [x] Hybrid handshake state structures.
-- [x] Initial Double Ratchet state construction.
-- [~] Complete initiator/responder integration.
+- [x] Initial Double Ratchet state construction primitives.
+- [~] Complete initiator/responder application integration.
 - [ ] Fix responder ephemeral X25519 keypair mismatch between handshake
-      and Double Ratchet initialization.
+    and Double Ratchet initialization.
 - [ ] Authenticate the handshake using Ed25519 identity signatures.
 - [ ] Bind the authenticated identity to the ephemeral X25519 key.
 - [ ] Bind ML-KEM material to the authenticated transcript.
