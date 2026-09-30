@@ -73,15 +73,15 @@ pub struct DoubleRatchet {
 }
 
 impl DoubleRatchet {
-    pub fn new_ventie(shared_key: [u8; 32], anek_dh_pub: PublicKey) -> Self {
+    pub fn init_initiator(shared_key: [u8; 32], remote_dh_pub: PublicKey) -> Self {
         let dhs = StaticSecret::random_from_rng(OsRng);
 
-        let dh_out = dhs.diffie_hellman(&anek_dh_pub);
+        let dh_out = dhs.diffie_hellman(&remote_dh_pub);
         let (rk, cks) = kdf_rk(&shared_key, dh_out.as_bytes());
 
         Self {
             dhs,
-            dhr: Some(anek_dh_pub),
+            dhr: Some(remote_dh_pub),
             rk,
             cks: Some(cks),
             ckr: None,
@@ -92,9 +92,9 @@ impl DoubleRatchet {
         }
     }
 
-    pub fn new_anek(shared_key: [u8; 32], anek_dh: StaticSecret) -> Self {
+    pub fn init_responder(shared_key: [u8; 32], responder_dh: StaticSecret) -> Self {
         Self {
-            dhs: anek_dh,
+            dhs: responder_dh,
             dhr: None,
             rk: shared_key,
             cks: None,
@@ -104,6 +104,16 @@ impl DoubleRatchet {
             pn: 0,
             mkskipped: HashMap::new(),
         }
+    }
+
+    #[deprecated(note = "Use init_initiator instead")]
+    pub fn new_ventie(shared_key: [u8; 32], anek_dh_pub: PublicKey) -> Self {
+        Self::init_initiator(shared_key, anek_dh_pub)
+    }
+
+    #[deprecated(note = "Use init_responder instead")]
+    pub fn new_anek(shared_key: [u8; 32], anek_dh: StaticSecret) -> Self {
+        Self::init_responder(shared_key, anek_dh)
     }
 
     pub fn encrypt(
@@ -303,41 +313,41 @@ mod tests {
     #[test]
     fn test_double_ratchet_basic_exchange() {
         let shared_secret = [42u8; 32];
-        let anek_dh = StaticSecret::random_from_rng(OsRng);
-        let anek_dh_pub = PublicKey::from(&anek_dh);
+        let responder_dh = StaticSecret::random_from_rng(OsRng);
+        let responder_dh_pub = PublicKey::from(&responder_dh);
 
-        let mut ventie = DoubleRatchet::new_ventie(shared_secret, anek_dh_pub);
-        let mut anek = DoubleRatchet::new_anek(shared_secret, anek_dh);
+        let mut initiator = DoubleRatchet::init_initiator(shared_secret, responder_dh_pub);
+        let mut responder = DoubleRatchet::init_responder(shared_secret, responder_dh);
 
         let ad = b"context-ad";
 
-        let msg1 = ventie.encrypt(b"Hello anek", ad).unwrap();
-        let decrypted1 = anek.decrypt(&msg1, ad).unwrap();
-        assert_eq!(decrypted1, b"Hello anek");
+        let msg1 = initiator.encrypt(b"Hello responder", ad).unwrap();
+        let decrypted1 = responder.decrypt(&msg1, ad).unwrap();
+        assert_eq!(decrypted1, b"Hello responder");
 
-        let msg2 = anek.encrypt(b"Hello ventie", ad).unwrap();
-        let decrypted2 = ventie.decrypt(&msg2, ad).unwrap();
-        assert_eq!(decrypted2, b"Hello ventie");
+        let msg2 = responder.encrypt(b"Hello initiator", ad).unwrap();
+        let decrypted2 = initiator.decrypt(&msg2, ad).unwrap();
+        assert_eq!(decrypted2, b"Hello initiator");
     }
 
     #[test]
     fn test_out_of_order_messages() {
         let shared_secret = [99u8; 32];
-        let anek_dh = StaticSecret::random_from_rng(OsRng);
-        let anek_dh_pub = PublicKey::from(&anek_dh);
+        let responder_dh = StaticSecret::random_from_rng(OsRng);
+        let responder_dh_pub = PublicKey::from(&responder_dh);
 
-        let mut ventie = DoubleRatchet::new_ventie(shared_secret, anek_dh_pub);
-        let mut anek = DoubleRatchet::new_anek(shared_secret, anek_dh);
+        let mut initiator = DoubleRatchet::init_initiator(shared_secret, responder_dh_pub);
+        let mut responder = DoubleRatchet::init_responder(shared_secret, responder_dh);
 
         let ad = b"test";
 
-        let msg1 = ventie.encrypt(b"Message 1", ad).unwrap();
-        let msg2 = ventie.encrypt(b"Message 2", ad).unwrap();
+        let msg1 = initiator.encrypt(b"Message 1", ad).unwrap();
+        let msg2 = initiator.encrypt(b"Message 2", ad).unwrap();
 
-        let dec2 = anek.decrypt(&msg2, ad).unwrap();
+        let dec2 = responder.decrypt(&msg2, ad).unwrap();
         assert_eq!(dec2, b"Message 2");
 
-        let dec1 = anek.decrypt(&msg1, ad).unwrap();
+        let dec1 = responder.decrypt(&msg1, ad).unwrap();
         assert_eq!(dec1, b"Message 1");
     }
 }
