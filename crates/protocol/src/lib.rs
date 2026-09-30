@@ -22,6 +22,7 @@ pub struct HandshakeInitPayload {
     pub sender_pubkey: [u8; 32],
     pub ephemeral_x25519: [u8; 32],
     pub ml_kem_pk: Vec<u8>,
+    pub signature: [u8; 64],
 }
 
 impl HandshakeInitPayload {
@@ -30,15 +31,16 @@ impl HandshakeInitPayload {
             sender_pubkey,
             ephemeral_x25519: init_output.x25519_public,
             ml_kem_pk: init_output.ml_kem_public,
+            signature: init_output.signature,
         }
     }
 }
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct HandshakeResponsePayload {
     pub recipient_pubkey: [u8; 32],
     pub ephemeral_x25519: [u8; 32],
     pub ml_kem_ct: Vec<u8>,
+    pub signature: [u8; 64],
 }
 
 impl HandshakeResponsePayload {
@@ -47,6 +49,7 @@ impl HandshakeResponsePayload {
             recipient_pubkey,
             ephemeral_x25519: resp_output.x25519_public,
             ml_kem_ct: resp_output.ml_kem_ciphertext.clone(),
+            signature: resp_output.signature,
         }
     }
 }

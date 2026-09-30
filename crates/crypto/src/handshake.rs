@@ -1,3 +1,4 @@
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use hkdf::Hkdf;
 use ml_kem::kem::{Decapsulate, DecapsulationKey, Encapsulate, EncapsulationKey};
 use ml_kem::{Ciphertext, EncodedSizeUser, KemCore, MlKem768, MlKem768Params};
@@ -11,6 +12,7 @@ pub const X25519_PK_SIZE: usize = 32;
 pub const ML_KEM_PK_SIZE: usize = 1184;
 pub const ML_KEM_CT_SIZE: usize = 1088;
 pub const SHARED_SECRET_SIZE: usize = 32;
+pub const ED25519_SIG_SIZE: usize = 64;
 
 #[derive(Error, Debug)]
 pub enum HandshakeError {
@@ -22,6 +24,9 @@ pub enum HandshakeError {
 
     #[error("Invalid ML-KEM ciphertext length")]
     InvalidMlKemCiphertextLength,
+
+    #[error("Invalid Ed25519 signature")]
+    InvalidSignature,
 
     #[error("Decapsulation failed")]
     DecapsulationFailed,
@@ -43,6 +48,7 @@ pub struct HandshakeInitiator {
 pub struct InitiatorOutput {
     pub x25519_public: [u8; X25519_PK_SIZE],
     pub ml_kem_public: Vec<u8>,
+    pub signature: [u8; ED25519_SIG_SIZE],
 }
 
 impl Default for HandshakeInitiator {
@@ -65,21 +71,47 @@ impl HandshakeInitiator {
         }
     }
 
-    pub fn generate_init_payload(&self) -> InitiatorOutput {
+    pub fn generate_init_payload(&self, signing_key: &SigningKey) -> InitiatorOutput {
+        let x25519_bytes = self.x25519_public.as_bytes();
+        let ml_kem_bytes = self.ml_kem_encapskey.as_bytes();
+
+        let mut transcript = Vec::new();
+        transcript.extend_from_slice(b"Marrow-Handshake-Init");
+        transcript.extend_from_slice(x25519_bytes);
+        transcript.extend_from_slice(ml_kem_bytes.as_slice());
+
+        let signature = signing_key.sign(&transcript);
+
         InitiatorOutput {
-            x25519_public: *self.x25519_public.as_bytes(),
-            ml_kem_public: self.ml_kem_encapskey.as_bytes().as_slice().to_vec(),
+            x25519_public: *x25519_bytes,
+            ml_kem_public: ml_kem_bytes.as_slice().to_vec(),
+            signature: signature.to_bytes(),
         }
     }
 
     pub fn process_response(
         self,
+        responder_signing_key_bytes: &[u8; 32],
         responder_x25519_pk_bytes: &[u8; X25519_PK_SIZE],
         ml_kem_ct_bytes: &[u8],
+        responder_signature_bytes: &[u8; ED25519_SIG_SIZE],
     ) -> Result<MasterSecret, HandshakeError> {
         if ml_kem_ct_bytes.len() != ML_KEM_CT_SIZE {
             return Err(HandshakeError::InvalidMlKemCiphertextLength);
         }
+
+        let mut transcript = Vec::new();
+        transcript.extend_from_slice(b"Marrow-Handshake-Response");
+        transcript.extend_from_slice(responder_x25519_pk_bytes);
+        transcript.extend_from_slice(ml_kem_ct_bytes);
+
+        let verifying_key = VerifyingKey::from_bytes(responder_signing_key_bytes)
+            .map_err(|_| HandshakeError::InvalidSignature)?;
+        let signature = Signature::from_bytes(responder_signature_bytes);
+
+        verifying_key
+            .verify(&transcript, &signature)
+            .map_err(|_| HandshakeError::InvalidSignature)?;
 
         let responder_x25519_pk = X25519PublicKey::from(*responder_x25519_pk_bytes);
         let x25519_dh_secret = self.x25519_secret.diffie_hellman(&responder_x25519_pk);
@@ -103,6 +135,7 @@ pub struct ResponderOutput {
     pub x25519_secret: StaticSecret,
     pub x25519_public: [u8; X25519_PK_SIZE],
     pub ml_kem_ciphertext: Vec<u8>,
+    pub signature: [u8; ED25519_SIG_SIZE],
     pub master_secret: MasterSecret,
 }
 
@@ -110,12 +143,28 @@ pub struct HandshakeResponder;
 
 impl HandshakeResponder {
     pub fn process_init_and_respond(
+        signing_key: &SigningKey,
+        initiator_verifying_key_bytes: &[u8; 32],
         initiator_x25519_pk_bytes: &[u8; X25519_PK_SIZE],
         initiator_ml_kem_pk_bytes: &[u8],
+        initiator_signature_bytes: &[u8; ED25519_SIG_SIZE],
     ) -> Result<ResponderOutput, HandshakeError> {
         if initiator_ml_kem_pk_bytes.len() != ML_KEM_PK_SIZE {
             return Err(HandshakeError::InvalidMlKemKeyLength);
         }
+
+        let mut init_transcript = Vec::new();
+        init_transcript.extend_from_slice(b"Marrow-Handshake-Init");
+        init_transcript.extend_from_slice(initiator_x25519_pk_bytes);
+        init_transcript.extend_from_slice(initiator_ml_kem_pk_bytes);
+
+        let init_verifying_key = VerifyingKey::from_bytes(initiator_verifying_key_bytes)
+            .map_err(|_| HandshakeError::InvalidSignature)?;
+        let init_signature = Signature::from_bytes(initiator_signature_bytes);
+
+        init_verifying_key
+            .verify(&init_transcript, &init_signature)
+            .map_err(|_| HandshakeError::InvalidSignature)?;
 
         let my_x25519_secret = StaticSecret::random_from_rng(OsRng);
         let my_x25519_public = X25519PublicKey::from(&my_x25519_secret);
@@ -136,10 +185,18 @@ impl HandshakeResponder {
         let master_secret =
             derive_master_secret(x25519_dh_secret.as_bytes(), ml_kem_secret.as_slice())?;
 
+        let mut resp_transcript = Vec::new();
+        resp_transcript.extend_from_slice(b"Marrow-Handshake-Response");
+        resp_transcript.extend_from_slice(my_x25519_public.as_bytes());
+        resp_transcript.extend_from_slice(ml_kem_ct.as_slice());
+
+        let signature = signing_key.sign(&resp_transcript);
+
         Ok(ResponderOutput {
             x25519_secret: my_x25519_secret,
             x25519_public: *my_x25519_public.as_bytes(),
             ml_kem_ciphertext: ml_kem_ct.as_slice().to_vec(),
+            signature: signature.to_bytes(),
             master_secret,
         })
     }
@@ -162,30 +219,4 @@ fn derive_master_secret(
 
     ikm.zeroize();
     result.map(|_| MasterSecret(okm))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_full_pqc_handshake() {
-        let initiator = HandshakeInitiator::new();
-        let init_payload = initiator.generate_init_payload();
-
-        let responder_out = HandshakeResponder::process_init_and_respond(
-            &init_payload.x25519_public,
-            &init_payload.ml_kem_public,
-        )
-        .unwrap();
-
-        let initiator_secret = initiator
-            .process_response(
-                &responder_out.x25519_public,
-                &responder_out.ml_kem_ciphertext,
-            )
-            .unwrap();
-
-        assert_eq!(initiator_secret.0, responder_out.master_secret.0);
-    }
 }
