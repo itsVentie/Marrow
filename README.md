@@ -54,112 +54,381 @@
 
 ## Roadmap
 
-<details>
-<summary><b>Phase 1: Core Primitives & Identity (Completed)</b></summary>
+> Roadmap status reflects the actual implementation state of the repository.
+> Features are marked as completed only when they are implemented and
+> sufficiently tested. Experimental and research features are explicitly
+> separated from the stable 1-to-1 messaging core.
 
-* [x] Cargo Workspace setup and modular crate design.
-* [x] Tauri v2 + Preact + TypeScript frontend pipeline initialization.
-* [x] Implement Ed25519 keypair generation and Argon2id local file encryption in `crates/crypto`.
-* [x] Build encrypted local KV abstraction over `redb` in `crates/storage`.
+### Legend
+
+- [x] Implemented and verified
+- [~] Partially implemented / requires hardening or integration work
+- [ ] Planned
+- [!] Blocked by a prerequisite
+
+---
+
+<details>
+<summary><b>Phase 0: Project Foundation & Engineering Infrastructure</b></summary>
+
+- [x] Cargo workspace and modular crate architecture.
+- [x] Rust core engine and Tauri v2 desktop shell.
+- [x] Preact + TypeScript + Vite frontend.
+- [x] Basic Rust ↔ Tauri IPC layer.
+- [x] Versioned Git hooks.
+- [x] Workspace formatting and linting configuration.
+- [x] Automated Rust test workflow.
+- [~] Fix all current `cargo fmt --check` failures.
+- [ ] Add frontend dependency installation to CI.
+- [ ] Add frontend type checking to CI.
+- [ ] Add frontend production build to CI.
+- [ ] Add release artifact verification.
+- [ ] Add dependency auditing (`cargo audit`, `cargo deny`).
+- [ ] Add SBOM generation for release artifacts.
+- [ ] Pin and document supported toolchain versions.
+- [ ] Define semantic versioning and protocol compatibility policy.
 
 </details>
 
 <details>
-<summary><b>Phase 2: Transport & Networking Layer</b></summary>
+<summary><b>Phase 1: Identity, Key Management & Local Cryptographic Foundation</b></summary>
 
-* [x] Implement binary framing (`postcard`) and serde layer in `crates/protocol`.
-* [x] Implement QUIC client transport (`quinn`) with automated TCP/TLS fallback (`tokio-rustls`).
-* [x] Implement hybrid X25519 + ML-KEM-768 post-quantum handshake (`crates/crypto` / `crates/protocol`).
-* [x] Build Double Ratchet session state machine for 1-on-1 sessions.
-* [x] Implement stateless relay routing layer with ephemeral token validation in `apps/relay`.
-* [x] Design adaptive padding and timing jitter algorithms to obfuscate traffic size/metadata against DPI analysis.
-* [x] Design custom MarrowCodec and frame length framing over libp2p request-response protocol (`r-network`).
-* [x] Build composite MarrowBehaviour routing structure (Kademlia DHT, Identify, Ping, AutoNAT).
-* [x] Implement NetworkNode async event loop for Swarm driver and channel-based IPC interface (`NetworkCommand`/`NetworkEvent`).
-* [x] Implement libp2p hole punching (STUN/TURN/ICE / Relay v2) for direct peer connections behind NAT.
-* [x] Connect `r-network` layer to Tauri state runtime and UI event dispatcher.
-
-</details>
-
-<details>
-<summary><b>Phase 3: Desktop Client & User Interface</b></summary>
-
-* [x] Design UI in Preact using CSS Modules.
-* [x] Integrate IPC invocations between Preact and Rust core via `@tauri-apps/api`.
-* [x] Implement background daemon/tray process for persistent network listening without UI overhead (`tauri` tray-icon + `prevent_close`).
-* [x] Integrate `tantivy` for instant local encrypted message search inside storage runtime.
-* [x] Implement secure local storage for contact lists and conversation histories.
-* [x] Build UI state logic for direct messaging, active contacts, and peer connection statuses.
-* [ ] Build key exporting/importing mechanisms with physical key backup features (BIP-39 mnemonic phrase).
+- [x] Ed25519 identity generation.
+- [x] Deterministic identity derivation from BIP-39 seed material.
+- [x] Argon2id-based local identity protection.
+- [x] X25519 key agreement primitives.
+- [x] ML-KEM-768 key encapsulation primitives.
+- [x] XChaCha20-Poly1305 authenticated encryption.
+- [x] Cryptographic key zeroization in implemented sensitive structures.
+- [~] Complete zeroization audit across all crates.
+- [ ] Define explicit key hierarchy for identity, storage, sessions,
+      and application data.
+- [ ] Add key-version identifiers to persistent cryptographic material.
+- [ ] Implement secure key rotation.
+- [ ] Implement identity backup/export using BIP-39.
+- [ ] Implement identity restore/import using BIP-39.
+- [ ] Add backup integrity verification and checksum validation.
+- [ ] Add secure identity deletion.
+- [ ] Add password/passphrase change with safe key migration.
+- [ ] Document identity recovery and compromise semantics.
 
 </details>
 
 <details>
-<summary><b>Phase 4: Secure Group Messaging & Public Channels</b></summary>
+<summary><b>Phase 2: Authenticated Hybrid Session Establishment</b></summary>
 
-* [ ] Implement TreeKEM / IETF MLS (Messaging Layer Security) protocol for dynamic encrypted group chats (`crates/mls`).
-* [ ] Design Blind Group Relay engine for server-side distribution of group frames without decrypting metadata.
-* [ ] Implement channel architecture (Broadcast channels with asymmetric signed state updates).
-* [ ] Build local group session state persistence with automatic group key rotation on member removal.
-
-</details>
-
-<details>
-<summary><b>Phase 5: Voice, Video & E2EE Real-Time Transport</b></summary>
-
-* [ ] Build native WebRTC / DTLS-SRTP audio engine with custom Post-Quantum key exchange extension (`webrtc-rs`).
-* [ ] Implement Opus audio codec pipeline (`opus-rs`) with adaptive bitrates, noise suppression, and voice activation.
-* [ ] Implement encrypted P2P signaling frame routing over `apps/relay` for NAT traversal (ICE/STUN/TURN).
-* [ ] Build background peer-to-peer audio calling state machine and UI overlay.
-
-</details>
-
-<details>
-<summary><b>Phase 6: Memory Security, Anonymity & Anti-Analysis</b></summary>
-
-* [ ] Memory pinning via `mlock` / `VirtualLock` to lock critical cryptographic key regions in physical RAM.
-* [ ] Implement Onion Routing layer over relay nodes (Multi-hop routing for full sender/receiver IP masking).
-* [ ] Integrate built-in proxy support (SOCKS5 / TOR / Shadow-like obfuscated QUIC transport).
-* [ ] Complete zeroization audits for sensitive memory regions (using `zeroize` crate across all crates).
-* [ ] Implement Panic Mode (Instant zeroization of in-memory keys and local storage drop via master passphrase).
+- [x] X25519 + ML-KEM-768 hybrid key exchange primitives.
+- [x] Hybrid handshake state structures.
+- [x] Initial Double Ratchet state construction.
+- [~] Complete initiator/responder integration.
+- [ ] Fix responder ephemeral X25519 keypair mismatch between handshake
+      and Double Ratchet initialization.
+- [ ] Authenticate the handshake using Ed25519 identity signatures.
+- [ ] Bind the authenticated identity to the ephemeral X25519 key.
+- [ ] Bind ML-KEM material to the authenticated transcript.
+- [ ] Define canonical transcript serialization.
+- [ ] Include protocol version and cryptographic suite identifiers
+      in the transcript.
+- [ ] Derive session secrets from the complete authenticated transcript.
+- [ ] Bind the application identity to the transport identity / PeerId.
+- [ ] Reject malformed, replayed, or inconsistent handshake states.
+- [ ] Add explicit handshake timeout and cancellation handling.
+- [ ] Add handshake state cleanup after failure.
+- [ ] Add deterministic handshake test vectors.
+- [ ] Add negative tests for MITM, key substitution, replay,
+      malformed ciphertext, and transcript modification.
 
 </details>
 
 <details>
-<summary><b>Phase 7: Hardening, Auditing & Resilience</b></summary>
+<summary><b>Phase 3: Reliable 1-to-1 End-to-End Messaging</b></summary>
 
-* [ ] Automated integration tests for network partitions, packet drops, and state recovery.
-* [ ] Stress testing `apps/relay` throughput and memory footprint under thousands of simultaneous streams.
-* [ ] Static analysis, Miri checks, clippy lint enforcement, and memory safety security audit.
-* [ ] Production release pipelines (Cross-platform builds for Windows, macOS, Linux).
-
-</details>
-
-<details>
-<summary><b>Phase 8: Architecture Hardening & I/O Isolation</b></summary>
-
-* [ ] **Sans-I/O Architecture Refactoring:** Decouple protocol framing, state machines, and cryptographic verification from direct operating system I/O (sockets and filesystem). Implement pure state-transition functions taking byte slices (`&[u8]`) to enable deterministic mock testing without network or disk overhead.
-* [ ] **Zero-Copy Serialization Audit:** Optimize all payload parsing paths using `zerocopy` / `postcard` traits, eliminating intermediate heap allocations and runtime memory fragmentation during QUIC packet processing.
-* [ ] **Deterministic Fuzz Testing:** Implement structured fuzzing targets using `cargo-fuzz` for wire protocols, frame bounds checking, and state-machine transitions under malformed inputs.
-* [ ] **Encrypted Storage Migration Tools:** Build automated database schema migration pipelines with backward-compatible key derivation upgrades inside `redb`.
-
-</details>
-
-<details>
-<summary><b>Phase 9: Post-Quantum Migration & Crypto Agility</b></summary>
-
-* [ ] **ML-DSA (Dilithium) Signature Integration:** Add support for ML-DSA-65 / ML-DSA-87 digital signatures alongside Ed25519 for identity verification and long-term public keys.
-* [ ] **Crypto Agility Versioning:** Implement dynamic cryptographic suite negotiation in protocol handshake headers to enable seamless algorithm upgrades without breaking backwards compatibility.
-* [ ] **Hardware Security Integration:** Build optional PKCS#11 / FIDO2 YubiKey integration for hardware-backed master key derivation and session approval.
+- [x] Double Ratchet root/send/receive chain implementation.
+- [x] DH ratchet implementation.
+- [x] Message counters and previous-chain-length handling.
+- [x] Skipped-message key storage.
+- [x] Maximum skipped-message limits.
+- [x] AEAD-protected message payloads.
+- [~] Complete application-level session integration.
+- [ ] Pass a complete Alice → Bob encrypted message.
+- [ ] Pass a complete Bob → Alice encrypted response.
+- [ ] Support out-of-order message delivery.
+- [ ] Support delayed messages using skipped keys.
+- [ ] Support dropped packets and retransmission.
+- [ ] Support concurrent message sends.
+- [ ] Queue messages while a handshake is in progress.
+- [ ] Securely persist ratchet state.
+- [ ] Recover ratchet state after application restart.
+- [ ] Detect and reject stale/replayed messages.
+- [ ] Add message-level authentication failure handling.
+- [ ] Remove duplicated ratchet header fields from the wire protocol.
+- [ ] Define a single canonical encrypted-message representation.
+- [ ] Add protocol versioning to encrypted message frames.
 
 </details>
 
 <details>
-<summary><b>Phase 10: eBPF Telemetry & Autonomous Node Fleet Administration</b></summary>
+<summary><b>Phase 4: Secure Local Persistence & Recovery</b></summary>
 
-* [ ] **eBPF-Based Kernel Telemetry:** Deploy lightweight eBPF probes in `apps/relay` nodes for real-time kernel-level packet inspection, drop tracking, and anti-DDoS traffic filtering without context switches.
-* [ ] **Zero-Knowledge Node Monitoring:** Implement anonymized health and performance reporting metrics from relay nodes using blinded aggregation primitives.
-* [ ] **Automated Relay Peer Discovery:** Build a decentralized peer-discovery protocol over distributed hash tables (DHT) with cryptographically verified node descriptors.
+- [x] Embedded `redb` storage.
+- [x] Encrypted persistent records using XChaCha20-Poly1305.
+- [x] Contact persistence.
+- [x] Session persistence.
+- [x] Message persistence.
+- [x] Tantivy-based local search integration.
+- [~] Protect search index contents at rest.
+- [ ] Encrypt or otherwise protect Tantivy index files.
+- [ ] Implement persistent search writer/worker instead of
+      opening and committing a writer for every message.
+- [ ] Define storage encryption key lifecycle.
+- [ ] Zeroize storage keys on logout.
+- [ ] Clear storage keys from application state after lock.
+- [ ] Securely destroy in-memory session and ratchet state on logout.
+- [ ] Implement crash-safe storage recovery.
+- [ ] Implement schema/version migrations.
+- [ ] Implement encrypted database backup/restore.
+- [ ] Test corrupted database recovery.
+- [ ] Test interrupted writes and process crashes.
+- [ ] Document what metadata remains observable locally.
+
+</details>
+
+<details>
+<summary><b>Phase 5: Network Transport & Blind Relay Hardening</b></summary>
+
+- [x] libp2p-based networking layer.
+- [x] TCP transport.
+- [x] libp2p QUIC transport.
+- [x] Noise-secured libp2p transport.
+- [x] Yamux stream multiplexing.
+- [x] Kademlia integration.
+- [x] Identify integration.
+- [x] Ping integration.
+- [x] AutoNAT integration.
+- [x] DCUtR integration.
+- [x] Relay client components.
+- [x] Quinn-based relay server prototype.
+- [x] In-memory active peer routing.
+- [x] Bounded offline message queues.
+- [x] TTL-based queue eviction.
+- [~] Unify the libp2p client relay architecture with the Quinn relay.
+- [ ] Define a single production transport architecture.
+- [ ] Implement authenticated relay registration.
+- [ ] Add relay connection lifecycle identifiers.
+- [ ] Fix duplicate-connection cleanup races.
+- [ ] Add relay rate limiting.
+- [ ] Add per-peer memory limits.
+- [ ] Add global queue limits.
+- [ ] Add connection limits.
+- [ ] Add backpressure.
+- [ ] Add relay abuse / flooding protection.
+- [ ] Add persistent production TLS certificates.
+- [ ] Add proper relay certificate validation.
+- [ ] Add secure relay deployment configuration.
+- [ ] Add recipient routing information to initial handshake frames.
+- [ ] Define an outer routing envelope independent from E2EE payloads.
+- [ ] Align network codec and protocol frame size limits.
+- [ ] Add malformed-frame and oversized-frame tests.
+- [ ] Add network partition and reconnection tests.
+
+</details>
+
+<details>
+<summary><b>Phase 6: Traffic Analysis Resistance</b></summary>
+
+- [x] Fixed-size message padding primitives.
+- [x] Binary frame padding.
+- [~] Timing jitter.
+- [ ] Implement a real dummy-traffic scheduler.
+- [ ] Implement configurable cover traffic policies.
+- [ ] Define traffic generation limits and battery/CPU constraints.
+- [ ] Evaluate metadata leakage under realistic traffic analysis.
+- [ ] Benchmark padding overhead.
+- [ ] Document exactly which metadata remains visible to relays.
+- [ ] Avoid claiming protection against traffic analysis that has not
+      been empirically evaluated.
+
+</details>
+
+<details>
+<summary><b>Phase 7: Desktop Client Completion</b></summary>
+
+- [x] Basic dashboard.
+- [x] Contact management.
+- [x] Conversation state management.
+- [x] Basic chat screen.
+- [x] Tauri event-based message delivery.
+- [x] Logout flow.
+- [~] Complete chat component hierarchy.
+- [ ] Implement message list virtualization.
+- [ ] Implement message composer.
+- [ ] Implement chat header.
+- [ ] Implement conversation list/sidebar.
+- [ ] Implement profile UI.
+- [ ] Implement settings UI.
+- [ ] Implement connection status UI.
+- [ ] Implement handshake/session status UI.
+- [ ] Implement backup/restore UI.
+- [ ] Implement identity management UI.
+- [ ] Implement secure lock/unlock state.
+- [ ] Add application auto-lock.
+- [ ] Add secure clipboard handling.
+- [ ] Add accessibility and keyboard navigation.
+- [ ] Add localization infrastructure.
+- [ ] Add desktop notifications without leaking message contents.
+- [ ] Add OS-specific secure storage integrations where appropriate.
+
+</details>
+
+<details>
+<summary><b>Phase 8: Security Hardening & Verification</b></summary>
+
+- [ ] Build a complete in-process Alice/Bob end-to-end test.
+- [ ] Test identity creation → handshake → encryption → delivery →
+      decryption → storage → restart → continued messaging.
+- [ ] Test out-of-order messages.
+- [ ] Test duplicate messages.
+- [ ] Test replay attacks.
+- [ ] Test malformed protocol frames.
+- [ ] Test invalid cryptographic keys.
+- [ ] Test failed authentication.
+- [ ] Test network interruption and recovery.
+- [ ] Test relay restart.
+- [ ] Test client restart.
+- [ ] Test storage corruption.
+- [ ] Add `cargo-fuzz` targets for protocol parsing.
+- [ ] Add fuzzing for handshake state transitions.
+- [ ] Add fuzzing for Double Ratchet state transitions.
+- [ ] Add fuzzing for storage deserialization.
+- [ ] Run Miri where applicable.
+- [ ] Run AddressSanitizer / relevant sanitizers where applicable.
+- [ ] Run dependency vulnerability audits.
+- [ ] Perform cryptographic API misuse audit.
+- [ ] Perform Tauri IPC security audit.
+- [ ] Define and enforce a strict Content Security Policy.
+- [ ] Minimize Tauri capabilities and filesystem access.
+- [ ] Audit all filesystem paths exposed through IPC.
+- [ ] Add rate limiting to expensive cryptographic operations.
+- [ ] Add resource exhaustion tests.
+- [ ] Publish reproducible security test results.
+- [ ] Perform an independent cryptographic/security review before
+      production security claims.
+
+</details>
+
+<details>
+<summary><b>Phase 9: Memory Protection & Local Privacy</b></summary>
+
+- [ ] Implement OS memory locking (`mlock` / `VirtualLock`) where supported.
+- [ ] Define portable fallback behavior when memory locking is unavailable.
+- [ ] Complete zeroization audit for ratchet keys and skipped keys.
+- [ ] Zeroize storage encryption keys on lock/logout.
+- [ ] Minimize plaintext lifetime in memory.
+- [ ] Implement secure application lock.
+- [ ] Implement panic mode.
+- [ ] Define secure local data destruction semantics.
+- [ ] Add optional encrypted temporary-file handling.
+- [ ] Audit crash dumps and logging for sensitive data.
+- [ ] Ensure production logging never contains plaintext message contents
+      or cryptographic secrets.
+
+</details>
+
+<details>
+<summary><b>Phase 10: Group Messaging & Multi-Party Sessions</b></summary>
+
+- [ ] Evaluate IETF Messaging Layer Security (MLS).
+- [ ] Design group identity and membership model.
+- [ ] Implement group session state machine.
+- [ ] Implement authenticated group membership changes.
+- [ ] Implement member addition/removal.
+- [ ] Implement group key rotation.
+- [ ] Implement group state persistence.
+- [ ] Implement group state recovery after restart.
+- [ ] Design blind group relay routing.
+- [ ] Define group metadata minimization.
+- [ ] Add group replay and state-conflict handling.
+- [ ] Add group synchronization and recovery.
+- [ ] Add comprehensive multi-party integration tests.
+
+> Group messaging will not be considered production-ready until the
+> 1-to-1 authenticated session and ratchet implementation is stable.
+
+</details>
+
+<details>
+<summary><b>Phase 11: Voice, Video & Real-Time Media</b></summary>
+
+- [ ] Design E2EE media session architecture.
+- [ ] Implement encrypted signaling over the Marrow protocol.
+- [ ] Implement WebRTC connectivity.
+- [ ] Implement DTLS-SRTP media transport.
+- [ ] Integrate Opus audio.
+- [ ] Implement adaptive bitrate control.
+- [ ] Implement voice activity detection.
+- [ ] Implement echo cancellation / noise suppression where supported.
+- [ ] Implement call lifecycle state machine.
+- [ ] Implement call recovery after network changes.
+- [ ] Add media permission handling.
+- [ ] Add call UI and background call state.
+- [ ] Evaluate post-quantum protection for media session establishment.
+- [ ] Benchmark CPU, latency, bandwidth, and battery consumption.
+
+</details>
+
+<details>
+<summary><b>Phase 12: Anonymity & Advanced Privacy</b></summary>
+
+- [ ] Define Marrow's anonymity threat model.
+- [ ] Document what IP and metadata are visible to peers and relays.
+- [ ] Implement proxy support.
+- [ ] Implement SOCKS5 support.
+- [ ] Evaluate Tor integration.
+- [ ] Evaluate multi-hop relay routing.
+- [ ] Implement onion-style routing only after the threat model
+      and routing protocol are formally specified.
+- [ ] Evaluate traffic-analysis resistance experimentally.
+- [ ] Add relay rotation policies.
+- [ ] Add relay trust minimization.
+- [ ] Add privacy-preserving relay discovery.
+- [ ] Document limitations of anonymity guarantees.
+
+</details>
+
+<details>
+<summary><b>Phase 13: Cryptographic Agility & Hardware Security</b></summary>
+
+- [ ] Define versioned cryptographic suite identifiers.
+- [ ] Implement explicit protocol capability negotiation.
+- [ ] Implement safe cryptographic suite migration.
+- [ ] Add ML-DSA support where justified by the threat model.
+- [ ] Evaluate hybrid Ed25519 + ML-DSA identity signatures.
+- [ ] Add hardware-backed key storage support.
+- [ ] Evaluate FIDO2 / WebAuthn integration.
+- [ ] Evaluate PKCS#11 support.
+- [ ] Support optional hardware-backed identity authorization.
+- [ ] Define migration procedures for compromised or deprecated keys.
+
+</details>
+
+<details>
+<summary><b>Phase 14: Relay Infrastructure & Research</b></summary>
+
+- [ ] Design authenticated relay discovery.
+- [ ] Implement decentralized relay discovery.
+- [ ] Implement cryptographically signed relay descriptors.
+- [ ] Add relay health checks.
+- [ ] Add relay capacity advertisement.
+- [ ] Add relay load balancing.
+- [ ] Add privacy-preserving relay telemetry.
+- [ ] Evaluate eBPF-based observability for Linux relay deployments.
+- [ ] Add optional operator metrics without collecting message contents.
+- [ ] Build relay fleet deployment tooling.
+- [ ] Build reproducible relay container images.
+- [ ] Add automated relay integration environments.
+
+> Research infrastructure must not become a dependency of the secure
+> 1-to-1 messaging core.
 
 </details>
 
