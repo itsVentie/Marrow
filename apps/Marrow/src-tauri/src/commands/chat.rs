@@ -8,7 +8,10 @@ use r_storage::{MessageDirection, Session, StoredMessage};
 use tauri::State;
 
 #[tauri::command]
-pub fn create_session(peer_pubkey_hex: String, state: State<'_, AppState>) -> Result<Session, String> {
+pub fn create_session(
+    peer_pubkey_hex: String,
+    state: State<'_, AppState>,
+) -> Result<Session, String> {
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
@@ -228,7 +231,9 @@ pub fn search_messages(
     state: State<'_, AppState>,
 ) -> Result<Vec<SearchResultDto>, String> {
     let search_guard = state.search.lock().map_err(map_err_str)?;
-    let search_index = search_guard.as_ref().ok_or("Search index not initialized")?;
+    let search_index = search_guard
+        .as_ref()
+        .ok_or("Search index not initialized")?;
 
     let max_results = limit.unwrap_or(20);
     let raw_results = search_index

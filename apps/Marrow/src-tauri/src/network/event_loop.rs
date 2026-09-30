@@ -28,7 +28,10 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
             ) {
                 let my_pubkey = {
                     let id_guard = state.identity.lock().unwrap();
-                    id_guard.as_ref().map(|i| i.public_hex()).unwrap_or_default()
+                    id_guard
+                        .as_ref()
+                        .map(|i| i.public_hex())
+                        .unwrap_or_default()
                 };
 
                 if let Ok(my_pk_array) = parse_peer_pk_array(&my_pubkey) {
@@ -90,8 +93,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                 if let Ok(master_secret) =
                     initiator.process_response(&payload.ephemeral_x25519, &payload.ml_kem_ct)
                 {
-                    let peer_x25519_pk =
-                        x25519_dalek::PublicKey::from(payload.ephemeral_x25519);
+                    let peer_x25519_pk = x25519_dalek::PublicKey::from(payload.ephemeral_x25519);
                     let mut sessions_guard = state.crypto_sessions.lock().unwrap();
 
                     sessions_guard.insert(

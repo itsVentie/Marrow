@@ -22,7 +22,7 @@ pub struct HandshakeInitPayload {
     pub sender_pubkey: [u8; 32],
     pub ephemeral_x25519: [u8; 32],
     pub ml_kem_pk: Vec<u8>,
-    pub signature: [u8; 64],
+    pub signature: Vec<u8>,
 }
 
 impl HandshakeInitPayload {
@@ -31,16 +31,17 @@ impl HandshakeInitPayload {
             sender_pubkey,
             ephemeral_x25519: init_output.x25519_public,
             ml_kem_pk: init_output.ml_kem_public,
-            signature: init_output.signature,
+            signature: init_output.signature.to_vec(),
         }
     }
 }
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct HandshakeResponsePayload {
     pub recipient_pubkey: [u8; 32],
     pub ephemeral_x25519: [u8; 32],
     pub ml_kem_ct: Vec<u8>,
-    pub signature: [u8; 64],
+    pub signature: Vec<u8>,
 }
 
 impl HandshakeResponsePayload {
@@ -49,7 +50,7 @@ impl HandshakeResponsePayload {
             recipient_pubkey,
             ephemeral_x25519: resp_output.x25519_public,
             ml_kem_ct: resp_output.ml_kem_ciphertext.clone(),
-            signature: resp_output.signature,
+            signature: resp_output.signature.to_vec(),
         }
     }
 }
@@ -183,27 +184,38 @@ mod tests {
 
     #[test]
     fn test_end_to_end_handshake_via_frames() {
-        let sender_identity = [0x01; 32];
-        let responder_identity = [0x02; 32];
+        use ed25519_dalek::SigningKey;
+        use rand::rngs::OsRng;
+
+        let initiator_signing_key = SigningKey::generate(&mut OsRng);
+        let responder_signing_key = SigningKey::generate(&mut OsRng);
 
         let initiator = HandshakeInitiator::new();
-        let init_out = initiator.generate_init_payload();
+        let init_out = initiator.generate_init_payload(&initiator_signing_key);
 
-        let init_frame = Frame::HandshakeInit(HandshakeInitPayload::new(sender_identity, init_out));
+        let init_frame = Frame::HandshakeInit(HandshakeInitPayload::new(
+            *initiator_signing_key.verifying_key().as_bytes(),
+            init_out,
+        ));
         let init_bytes = init_frame.encode().expect("Failed to encode init frame");
-
         let decoded_init_frame = Frame::decode(&init_bytes).expect("Failed to decode init frame");
 
         let (resp_payload, responder_secret) = match decoded_init_frame {
             Frame::HandshakeInit(payload) => {
                 let resp_out = HandshakeResponder::process_init_and_respond(
+                    &responder_signing_key,
+                    &payload.sender_pubkey,
                     &payload.ephemeral_x25519,
                     &payload.ml_kem_pk,
+                    &payload.signature,
                 )
                 .expect("Failed to process init at responder");
 
                 let secret = resp_out.master_secret.0;
-                let resp_payload = HandshakeResponsePayload::new(responder_identity, &resp_out);
+                let resp_payload = HandshakeResponsePayload::new(
+                    *responder_signing_key.verifying_key().as_bytes(),
+                    &resp_out,
+                );
                 (resp_payload, secret)
             }
             _ => panic!("Expected HandshakeInit frame"),
@@ -211,13 +223,17 @@ mod tests {
 
         let resp_frame = Frame::HandshakeResponse(resp_payload);
         let resp_bytes = resp_frame.encode().expect("Failed to encode resp frame");
-
         let decoded_resp_frame = Frame::decode(&resp_bytes).expect("Failed to decode resp frame");
 
         let initiator_secret = match decoded_resp_frame {
             Frame::HandshakeResponse(payload) => {
                 initiator
-                    .process_response(&payload.ephemeral_x25519, &payload.ml_kem_ct)
+                    .process_response(
+                        responder_signing_key.verifying_key().as_bytes(),
+                        &payload.ephemeral_x25519,
+                        &payload.ml_kem_ct,
+                        &payload.signature,
+                    )
                     .expect("Failed to process response at initiator")
                     .0
             }
@@ -226,4 +242,3 @@ mod tests {
 
         assert_eq!(initiator_secret, responder_secret);
     }
-}
