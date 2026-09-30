@@ -90,7 +90,8 @@ pub enum Frame {
 impl Frame {
     pub fn encode(&self) -> Result<Vec<u8>, ProtocolError> {
         let bytes =
-            bincode::serialize(self).map_err(|e| ProtocolError::Serialization(e.to_string()))?;
+            bincode::serialize(self)
+                .map_err(|e| ProtocolError::Serialization(e.to_string()))?;
 
         if bytes.len() > MAX_FRAME_SIZE {
             return Err(ProtocolError::FrameTooLarge(bytes.len()));
@@ -104,14 +105,17 @@ impl Frame {
             return Err(ProtocolError::FrameTooLarge(bytes.len()));
         }
 
-        bincode::deserialize(bytes).map_err(|e| ProtocolError::Deserialization(e.to_string()))
+        bincode::deserialize(bytes)
+            .map_err(|e| ProtocolError::Deserialization(e.to_string()))
     }
 
     pub fn encode_padded(&self) -> Result<Vec<u8>, ProtocolError> {
         let mut encoded = self.encode()?;
         let current_len = encoded.len();
 
-        let target_len = current_len.div_ceil(PADDING_BLOCK_SIZE) * PADDING_BLOCK_SIZE;
+        let target_len =
+            current_len.div_ceil(PADDING_BLOCK_SIZE) * PADDING_BLOCK_SIZE;
+
         let padding_needed = target_len - current_len;
 
         if padding_needed > 0 {
@@ -129,32 +133,44 @@ impl Frame {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use r_crypto::handshake::{HandshakeInitiator, HandshakeResponder};
+    use r_crypto::handshake::{
+        HandshakeInitiator,
+        HandshakeResponder,
+    };
 
     #[test]
     fn test_ping_pong_frame() {
         let frame = Frame::Ping;
+
         let encoded = frame.encode().unwrap();
         let decoded = Frame::decode(&encoded).unwrap();
+
         assert_eq!(frame, decoded);
     }
 
     #[test]
     fn test_dummy_frame() {
         let frame = Frame::Dummy(vec![0xAA; 128]);
+
         let encoded = frame.encode().unwrap();
         let decoded = Frame::decode(&encoded).unwrap();
+
         assert_eq!(frame, decoded);
     }
 
     #[test]
     fn test_padded_encoding() {
         let frame = Frame::Ping;
+
         let padded_bytes = frame.encode_padded().unwrap();
 
-        assert_eq!(padded_bytes.len() % PADDING_BLOCK_SIZE, 0);
+        assert_eq!(
+            padded_bytes.len() % PADDING_BLOCK_SIZE,
+            0
+        );
 
         let decoded = Frame::decode(&padded_bytes).unwrap();
+
         assert_eq!(frame, decoded);
     }
 
@@ -170,6 +186,7 @@ mod tests {
         };
 
         let frame = Frame::Message(payload);
+
         let encoded = frame.encode().unwrap();
         let decoded = Frame::decode(&encoded).unwrap();
 
@@ -190,7 +207,10 @@ mod tests {
         let frame = Frame::Message(oversized_payload);
         let result = frame.encode();
 
-        assert!(matches!(result, Err(ProtocolError::FrameTooLarge(_))));
+        assert!(matches!(
+            result,
+            Err(ProtocolError::FrameTooLarge(_))
+        ));
     }
 
     #[test]
@@ -198,60 +218,161 @@ mod tests {
         use ed25519_dalek::SigningKey;
         use rand::rngs::OsRng;
 
-        let initiator_signing_key = SigningKey::generate(&mut OsRng);
-        let responder_signing_key = SigningKey::generate(&mut OsRng);
+        let initiator_signing_key =
+            SigningKey::generate(&mut OsRng);
 
-        let initiator = HandshakeInitiator::new();
-        let init_out = initiator.generate_init_payload(&initiator_signing_key);
+        let responder_signing_key =
+            SigningKey::generate(&mut OsRng);
 
-        let init_frame = Frame::HandshakeInit(HandshakeInitPayload::new(
-            *initiator_signing_key.verifying_key().as_bytes(),
-            init_out,
-        ));
-        let init_bytes = init_frame.encode().expect("Failed to encode init frame");
-        let decoded_init_frame = Frame::decode(&init_bytes).expect("Failed to decode init frame");
+        let initiator_pubkey =
+            *initiator_signing_key.verifying_key().as_bytes();
 
-        let (resp_payload, responder_secret) = match decoded_init_frame {
+        let responder_pubkey =
+            *responder_signing_key.verifying_key().as_bytes();
+
+        let mut initiator = HandshakeInitiator::new();
+
+        let init_out = initiator.generate_init_payload(
+            &initiator_signing_key,
+            &responder_pubkey,
+        );
+
+        let init_frame = Frame::HandshakeInit(
+            HandshakeInitPayload::new(
+                initiator_pubkey,
+                init_out,
+            ),
+        );
+
+        let init_bytes = init_frame
+            .encode()
+            .expect("Failed to encode init frame");
+
+        let decoded_init_frame = Frame::decode(&init_bytes)
+            .expect("Failed to decode init frame");
+
+        let (resp_payload, responder_secret) =
+            match decoded_init_frame {
+                Frame::HandshakeInit(payload) => {
+                    let resp_out =
+                        HandshakeResponder::process_init_and_respond(
+                            &responder_signing_key,
+                            &payload.sender_pubkey,
+                            &payload.recipient_pubkey,
+                            &payload.ephemeral_x25519,
+                            &payload.ml_kem_pk,
+                            &payload.signature,
+                        )
+                        .expect(
+                            "Failed to process init at responder",
+                        );
+
+                    let secret = resp_out.master_secret.0;
+
+                    let resp_payload =
+                        HandshakeResponsePayload::new(
+                            responder_pubkey,
+                            payload.sender_pubkey,
+                            &resp_out,
+                        );
+
+                    (resp_payload, secret)
+                }
+
+                _ => {
+                    panic!("Expected HandshakeInit frame");
+                }
+            };
+
+        let resp_frame =
+            Frame::HandshakeResponse(resp_payload);
+
+        let resp_bytes = resp_frame
+            .encode()
+            .expect("Failed to encode response frame");
+
+        let decoded_resp_frame = Frame::decode(&resp_bytes)
+            .expect("Failed to decode response frame");
+
+        let initiator_secret =
+            match decoded_resp_frame {
+                Frame::HandshakeResponse(payload) => {
+                    initiator
+                        .process_response(
+                            &payload.sender_pubkey,
+                            &payload.recipient_pubkey,
+                            &payload.ephemeral_x25519,
+                            &payload.ml_kem_ct,
+                            &payload.signature,
+                        )
+                        .expect(
+                            "Failed to process response at initiator",
+                        )
+                        .0
+                }
+
+                _ => {
+                    panic!("Expected HandshakeResponse frame");
+                }
+            };
+
+        assert_eq!(
+            initiator_secret,
+            responder_secret,
+            "Master secrets must match after PQ-hybrid handshake"
+        );
+    }
+
+    #[test]
+    fn test_handshake_init_recipient_survives_roundtrip() {
+        use ed25519_dalek::SigningKey;
+        use rand::rngs::OsRng;
+
+        let initiator_signing_key =
+            SigningKey::generate(&mut OsRng);
+
+        let responder_signing_key =
+            SigningKey::generate(&mut OsRng);
+
+        let initiator_pubkey =
+            *initiator_signing_key.verifying_key().as_bytes();
+
+        let responder_pubkey =
+            *responder_signing_key.verifying_key().as_bytes();
+
+        let mut initiator = HandshakeInitiator::new();
+
+        let init_out = initiator.generate_init_payload(
+            &initiator_signing_key,
+            &responder_pubkey,
+        );
+
+        let frame = Frame::HandshakeInit(
+            HandshakeInitPayload::new(
+                initiator_pubkey,
+                init_out,
+            ),
+        );
+
+        let decoded = Frame::decode(
+            &frame.encode().unwrap(),
+        )
+        .unwrap();
+
+        match decoded {
             Frame::HandshakeInit(payload) => {
-                let resp_out = HandshakeResponder::process_init_and_respond(
-                    &responder_signing_key,
-                    &payload.sender_pubkey,
-                    &payload.ephemeral_x25519,
-                    &payload.ml_kem_pk,
-                    &payload.signature,
-                )
-                .expect("Failed to process init at responder");
-
-                let secret = resp_out.master_secret.0;
-                let resp_payload = HandshakeResponsePayload::new(
-                    *responder_signing_key.verifying_key().as_bytes(),
+                assert_eq!(
                     payload.sender_pubkey,
-                    &resp_out,
+                    initiator_pubkey
                 );
-                (resp_payload, secret)
+
+                assert_eq!(
+                    payload.recipient_pubkey,
+                    responder_pubkey
+                );
             }
+
             _ => panic!("Expected HandshakeInit frame"),
-        };
-
-        let resp_frame = Frame::HandshakeResponse(resp_payload);
-        let resp_bytes = resp_frame.encode().expect("Failed to encode resp frame");
-        let decoded_resp_frame = Frame::decode(&resp_bytes).expect("Failed to decode resp frame");
-
-        let initiator_secret = match decoded_resp_frame {
-            Frame::HandshakeResponse(payload) => {
-                initiator
-                    .process_response(
-                        &payload.sender_pubkey,
-                        &payload.ephemeral_x25519,
-                        &payload.ml_kem_ct,
-                        &payload.signature,
-                    )
-                    .expect("Failed to process response at initiator")
-                    .0
-            }
-            _ => panic!("Expected HandshakeResponse frame"),
-        };
-
-        assert_eq!(initiator_secret, responder_secret);
+        }
     }
 }
