@@ -1,6 +1,11 @@
 use r_crypto::handshake::{HandshakeInitiator, HandshakeResponder};
 use r_crypto::Identity;
-use r_protocol::{EncryptedMessagePayload, Frame, HandshakeInitPayload, HandshakeResponsePayload};
+use r_protocol::{
+    EncryptedMessagePayload,
+    Frame,
+    HandshakeInitPayload,
+    HandshakeResponsePayload,
+};
 
 #[test]
 fn test_e2e_handshake_and_frame_pipeline() {
@@ -10,11 +15,16 @@ fn test_e2e_handshake_and_frame_pipeline() {
     let ventie_pubkey = *ventie_identity.verifying_key().as_bytes();
     let anek_pubkey = *anek_identity.verifying_key().as_bytes();
 
-    let initiator = HandshakeInitiator::new();
-    let ventie_sk = ventie_identity.signing_key();
-    let init_out = initiator.generate_init_payload(&ventie_sk);
+    let mut initiator = HandshakeInitiator::new();
 
-    let init_payload = HandshakeInitPayload::new(ventie_pubkey, init_out);
+    let ventie_sk = ventie_identity.signing_key();
+
+    let init_out =
+        initiator.generate_init_payload(&ventie_sk, &anek_pubkey);
+
+    let init_payload =
+        HandshakeInitPayload::new(ventie_pubkey, init_out);
+
     let init_frame = Frame::HandshakeInit(init_payload);
 
     let encoded_init = init_frame
@@ -22,32 +32,38 @@ fn test_e2e_handshake_and_frame_pipeline() {
         .expect("Failed to encode HandshakeInit frame");
 
     let decoded_init_frame =
-        Frame::decode(&encoded_init).expect("Failed to decode HandshakeInit frame");
+        Frame::decode(&encoded_init)
+            .expect("Failed to decode HandshakeInit frame");
 
-    let (resp_out, responder_secret) = match decoded_init_frame {
+    let (resp_payload, responder_secret) = match decoded_init_frame {
         Frame::HandshakeInit(payload) => {
             let anek_sk = anek_identity.signing_key();
-            let resp_out = HandshakeResponder::process_init_and_respond(
-                &anek_sk,
-                &payload.sender_pubkey,
-                &payload.ephemeral_x25519,
-                &payload.ml_kem_pk,
-                &payload.signature,
-            )
-            .expect("Failed to process init at responder");
+
+            let resp_out =
+                HandshakeResponder::process_init_and_respond(
+                    &anek_sk,
+                    &payload.sender_pubkey,
+                    &payload.recipient_pubkey,
+                    &payload.ephemeral_x25519,
+                    &payload.ml_kem_pk,
+                    &payload.signature,
+                )
+                .expect("Failed to process init at responder");
 
             let secret = resp_out.master_secret.0;
-            (resp_out, secret)
+
+            let resp_payload = HandshakeResponsePayload::new(
+                anek_pubkey,
+                payload.sender_pubkey,
+                &resp_out,
+            );
+
+            (resp_payload, secret)
         }
+
         _ => panic!("Expected HandshakeInit frame"),
     };
 
-    let anek_sk_resp = anek_identity.signing_key();
-    let resp_payload = HandshakeResponsePayload::new(
-        *anek_sk_resp.verifying_key().as_bytes(),
-        ventie_pubkey,
-        &resp_out,
-    );
     let resp_frame = Frame::HandshakeResponse(resp_payload);
 
     let encoded_resp = resp_frame
@@ -55,25 +71,27 @@ fn test_e2e_handshake_and_frame_pipeline() {
         .expect("Failed to encode HandshakeResponse frame");
 
     let decoded_resp_frame =
-        Frame::decode(&encoded_resp).expect("Failed to decode HandshakeResponse frame");
+        Frame::decode(&encoded_resp)
+            .expect("Failed to decode HandshakeResponse frame");
 
     let initiator_secret = match decoded_resp_frame {
-        Frame::HandshakeResponse(payload) => {
-            initiator
-                .process_response(
-                    &payload.sender_pubkey,
-                    &payload.ephemeral_x25519,
-                    &payload.ml_kem_ct,
-                    &payload.signature,
-                )
-                .expect("Failed to process response at initiator")
-                .0
-        }
+        Frame::HandshakeResponse(payload) => initiator
+            .process_response(
+                &payload.sender_pubkey,
+                &payload.recipient_pubkey,
+                &payload.ephemeral_x25519,
+                &payload.ml_kem_ct,
+                &payload.signature,
+            )
+            .expect("Failed to process response at initiator")
+            .0,
+
         _ => panic!("Expected HandshakeResponse frame"),
     };
 
     assert_eq!(
-        initiator_secret, responder_secret,
+        initiator_secret,
+        responder_secret,
         "Master secrets must match after PQ-hybrid handshake"
     );
 
@@ -87,12 +105,14 @@ fn test_e2e_handshake_and_frame_pipeline() {
     };
 
     let msg_frame = Frame::Message(msg_payload);
+
     let padded_encoded_msg = msg_frame
         .encode_padded()
         .expect("Failed to encode padded message frame");
 
     let decoded_msg_frame =
-        Frame::decode(&padded_encoded_msg).expect("Failed to decode padded message frame");
+        Frame::decode(&padded_encoded_msg)
+            .expect("Failed to decode padded message frame");
 
     assert_eq!(msg_frame, decoded_msg_frame);
 }
