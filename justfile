@@ -2,7 +2,7 @@
 set shell := ["sh", "-cu"]
 
 [windows]
-set shell := ["powershell.exe", "-NoLogo", "-Command"]
+set shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 
 frontend := "apps/Marrow"
 
