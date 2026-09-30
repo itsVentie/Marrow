@@ -48,6 +48,18 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                         );
                     }
 
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs() as i64;
+
+                    {
+                        let storage_guard = state.storage.lock().unwrap();
+                        if let Some(ref storage) = *storage_guard {
+                            let _ = storage.create_session(&sender_pubkey_hex, now);
+                        }
+                    }
+
                     let resp_payload = HandshakeResponsePayload::new(my_pk_array, &resp_out);
                     let response_frame = Frame::HandshakeResponse(resp_payload);
 
@@ -94,6 +106,16 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_pk_hex: String,
                             sequence_number: 0,
                         },
                     );
+
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs() as i64;
+
+                    let storage_guard = state.storage.lock().unwrap();
+                    if let Some(ref storage) = *storage_guard {
+                        let _ = storage.create_session(&peer_pk_hex, now);
+                    }
                 }
             }
         }
