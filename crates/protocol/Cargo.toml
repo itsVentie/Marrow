@@ -11,3 +11,5 @@ thiserror = "2.0"
 
 [dev-dependencies]
 hex = "0.4"
+ed25519-dalek.workspace = true
+rand.workspace = true
