@@ -6,6 +6,7 @@ members = [
     "crates/network",
     "crates/protocol",
     "crates/relay",
+    "crates/plugins",
     "apps/Marrow/src-tauri",
     "apps/Marrow-mobile/src-tauri"
 ]
