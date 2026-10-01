@@ -157,7 +157,80 @@
   resize: none;
   outline: none;
 }
+.dangerZone {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
 
+.dangerLabel {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+}
+
+.dangerLogoutBtn {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dangerLogoutBtn:hover {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+.avatarBtn {
+  position: relative;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarPlaceholder {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--bg-secondary, #2a2d34);
+  border: 1px solid var(--border-color, #3a3d45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary, #e1e1e1);
+  transition: all 0.2s ease;
+}
+
+.avatarBtn:hover .avatarPlaceholder {
+  border-color: var(--accent-color, #6366f1);
+  background: var(--bg-hover, #32353e);
+}
+
+.avatarPlaceholder svg {
+  width: 18px;
+  height: 18px;
+}
+
+.avatarStatus {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  border: 2px solid var(--bg-primary, #1e1e24);
+}
 
 .pluginList {
   display: flex;

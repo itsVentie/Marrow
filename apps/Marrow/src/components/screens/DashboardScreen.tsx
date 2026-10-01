@@ -109,6 +109,7 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
 
   const handleLogoutClick = async () => {
     await api.logoutIdentity();
+    showSettingsModal.value = false;
     onLogout();
   };
 
@@ -137,14 +138,22 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
           <button onClick={() => (showPluginsModal.value = true)} className={styles.secondaryBtn}>
             Plugins
           </button>
-          <button onClick={() => (showProfileModal.value = true)} className={styles.secondaryBtn}>
-            Profile
-          </button>
+            
           <button onClick={() => (showSettingsModal.value = true)} className={styles.secondaryBtn}>
             Settings
           </button>
-          <button onClick={handleLogoutClick} className={styles.logoutBtn}>
-            Logout
+          
+          <button 
+            onClick={() => (showProfileModal.value = true)} 
+            className={styles.avatarBtn}
+            title="Profile"
+          >
+            <div className={styles.avatarPlaceholder}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+            </div>
+            <span className={styles.avatarStatus} />
           </button>
         </div>
       </header>
@@ -314,6 +323,13 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
             </div>
 
             <p className={styles.stubNotice}>Network runtime options can be modified in config.toml [STUB]</p>
+
+            <div className={styles.dangerZone}>
+              <label className={styles.dangerLabel}>Session Control:</label>
+              <button onClick={handleLogoutClick} className={styles.dangerLogoutBtn}>
+                Logout
+              </button>
+            </div>
 
             <button onClick={() => (showSettingsModal.value = false)} className={styles.closeModalBtn}>
               Close
