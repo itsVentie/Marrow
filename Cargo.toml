@@ -5,9 +5,9 @@ members = [
     "crates/storage",
     "crates/network",
     "crates/protocol",
+    "crates/relay",
     "apps/Marrow/src-tauri",
-    "apps/Marrow-mobile/src-tauri",
-    "apps/relay"
+    "apps/Marrow-mobile/src-tauri"
 ]
 
 [workspace.dependencies]
