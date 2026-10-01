@@ -19,6 +19,12 @@
   border-bottom: 1px solid #334155;
 }
 
+.headerBrand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .headerActions {
   display: flex;
   align-items: center;
@@ -41,7 +47,6 @@
   border-color: #475569;
 }
 
-/* Modals */
 .modalOverlay {
   position: fixed;
   top: 0;
@@ -57,7 +62,7 @@
 }
 
 .modalContent {
-  width: 420px;
+  width: 440px;
   background-color: #1e293b;
   border: 1px solid #334155;
   border-radius: 12px;
@@ -68,9 +73,64 @@
   gap: 1rem;
 }
 
+.modalHeaderWithBadge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .modalContent h4 {
   margin: 0;
   font-size: 1.1rem;
+  color: #f8fafc;
+}
+
+.profileCard {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: #0f172a;
+  padding: 0.85rem;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
+
+.avatarWrapper {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  background-color: #334155;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+}
+
+.avatarSvg {
+  width: 28px;
+  height: 28px;
+}
+
+.statusIndicator {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  background-color: #22c55e;
+  border: 2px solid #0f172a;
+  border-radius: 50%;
+}
+
+.profileDetails {
+  display: flex;
+  flex-direction: column;
+}
+
+.username {
+  font-weight: 600;
+  font-size: 0.95rem;
   color: #f8fafc;
 }
 
@@ -98,19 +158,79 @@
   outline: none;
 }
 
-.modalInfo {
-  background-color: #0f172a;
-  padding: 0.75rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  color: #94a3b8;
+
+.pluginList {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.75rem;
+  max-height: 220px;
+  overflow-y: auto;
 }
 
-.modalInfo p {
+.pluginItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #0f172a;
+  border: 1px solid #334155;
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+
+.pluginInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pluginTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #f8fafc;
+}
+
+.pluginVersion {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-family: monospace;
+}
+
+.pluginDesc {
   margin: 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.pluginEnableBtn,
+.pluginDisableBtn {
+  padding: 0.35rem 0.65rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.15s ease;
+}
+
+.pluginEnableBtn {
+  background-color: #3b82f6;
+  color: #fff;
+}
+
+.pluginEnableBtn:hover {
+  background-color: #2563eb;
+}
+
+.pluginDisableBtn {
+  background-color: #334155;
+  color: #94a3b8;
+}
+
+.pluginDisableBtn:hover {
+  background-color: #475569;
+  color: #f8fafc;
 }
 
 .stubNotice {
@@ -208,6 +328,17 @@
   overflow: hidden;
 }
 
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.panelHeader h4 {
+  margin: 0;
+}
+
 .panel h4 {
   margin: 0 0 1rem 0;
   font-size: 0.95rem;
@@ -215,6 +346,16 @@
   color: #cbd5e1;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.badge {
+  font-size: 0.75rem;
+  background-color: #0f172a;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  font-weight: 600;
 }
 
 .list {

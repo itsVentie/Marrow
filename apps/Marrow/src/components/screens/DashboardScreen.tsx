@@ -9,6 +9,14 @@ interface Props {
   onLogout: () => void;
 }
 
+interface PluginStub {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  enabled: boolean;
+}
+
 export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) {
   const contacts = useSignal<Contact[]>([]);
   const sessions = useSignal<Session[]>([]);
@@ -19,7 +27,32 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
 
   const showProfileModal = useSignal(false);
   const showSettingsModal = useSignal(false);
+  const showPluginsModal = useSignal(false);
   const copiedKey = useSignal(false);
+
+  const plugins = useSignal<PluginStub[]>([
+    {
+      id: "1",
+      name: "PassClip",
+      version: "1.0.0",
+      description: "Nothing",
+      enabled: true,
+    },
+    {
+      id: "2",
+      name: "JarTight",
+      version: "1.0.0",
+      description: "Nothing",
+      enabled: false,
+    },
+    {
+      id: "3",
+      name: "NearCloud",
+      version: "1.0.0",
+      description: "Nothing",
+      enabled: false,
+    },
+  ]);
 
   const loadData = async () => {
     try {
@@ -87,14 +120,23 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
     }, 2000);
   };
 
+  const togglePlugin = (id: string) => {
+    plugins.value = plugins.value.map((p) =>
+      p.id === id ? { ...p, enabled: !p.enabled } : p
+    );
+  };
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <div>
+        <div className={styles.headerBrand}>
           <h3>Marrow</h3>
           <div className={styles.pubkey}>ID: {identity.pubkey_hex.slice(0, 16)}...</div>
         </div>
         <div className={styles.headerActions}>
+          <button onClick={() => (showPluginsModal.value = true)} className={styles.secondaryBtn}>
+            Plugins
+          </button>
           <button onClick={() => (showProfileModal.value = true)} className={styles.secondaryBtn}>
             Profile
           </button>
@@ -111,7 +153,10 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
 
       <div className={styles.grid}>
         <section className={styles.panel}>
-          <h4>Active Sessions</h4>
+          <div className={styles.panelHeader}>
+            <h4>Active Sessions</h4>
+            <span className={styles.badge}>{sessions.value.length}</span>
+          </div>
           <div className={styles.list}>
             {sessions.value.map((s) => (
               <div
@@ -151,7 +196,10 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
             <button type="submit">Save Contact</button>
           </form>
 
-          <h4>Contacts</h4>
+          <div className={styles.panelHeader}>
+            <h4>Contacts</h4>
+            <span className={styles.badge}>{contacts.value.length}</span>
+          </div>
           <div className={styles.list}>
             {contacts.value.map((c) => (
               <div key={c.pubkey_hex} className={styles.contactCard}>
@@ -175,7 +223,22 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
       {showProfileModal.value && (
         <div className={styles.modalOverlay} onClick={() => (showProfileModal.value = false)}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h4>Identity</h4>
+            <div className={styles.modalHeaderWithBadge}>
+              <h4>Profile</h4>
+            </div>
+
+            <div className={styles.profileCard}>
+              <div className={styles.avatarWrapper}>
+                <svg className={styles.avatarSvg} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+                <div className={styles.statusIndicator} />
+              </div>
+              <div className={styles.profileDetails}>
+                <span className={styles.username}>User</span>
+              </div>
+            </div>
+
             <div className={styles.modalField}>
               <label>Full Public Key (Hex):</label>
               <textarea readOnly value={identity.pubkey_hex} rows={3} />
@@ -183,11 +246,46 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
                 {copiedKey.value ? "Copied!" : "Copy Public Key"}
               </button>
             </div>
-            <div className={styles.modalInfo}>
-              <p><strong>Crypto Suite:</strong> ML-KEM-768 + X25519</p>
-              <p><strong>Status:</strong> Active & Loaded</p>
-            </div>
+
             <button onClick={() => (showProfileModal.value = false)} className={styles.closeModalBtn}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showPluginsModal.value && (
+        <div className={styles.modalOverlay} onClick={() => (showPluginsModal.value = false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeaderWithBadge}>
+              <h4>Plugin Manager</h4>
+            </div>
+
+            <p className={styles.stubNotice}>
+              Extensions can be toggled below:
+            </p>
+
+            <div className={styles.pluginList}>
+              {plugins.value.map((plugin) => (
+                <div key={plugin.id} className={styles.pluginItem}>
+                  <div className={styles.pluginInfo}>
+                    <div className={styles.pluginTitle}>
+                      <strong>{plugin.name}</strong>
+                      <span className={styles.pluginVersion}>v{plugin.version}</span>
+                    </div>
+                    <p className={styles.pluginDesc}>{plugin.description}</p>
+                  </div>
+                  <button
+                    onClick={() => togglePlugin(plugin.id)}
+                    className={plugin.enabled ? styles.pluginDisableBtn : styles.pluginEnableBtn}
+                  >
+                    {plugin.enabled ? "Disable" : "Enable"}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => (showPluginsModal.value = false)} className={styles.closeModalBtn}>
               Close
             </button>
           </div>
@@ -197,16 +295,26 @@ export function DashboardScreen({ identity, onSelectSession, onLogout }: Props) 
       {showSettingsModal.value && (
         <div className={styles.modalOverlay} onClick={() => (showSettingsModal.value = false)}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h4>Settings</h4>
+            <div className={styles.modalHeaderWithBadge}>
+              <h4>Settings</h4>
+              <span className={styles.stubTag}>STUB</span>
+            </div>
+
             <div className={styles.modalField}>
-              <label>Relay Server Node:</label>
+              <label>Relay Server Node [STUB]:</label>
               <input type="text" placeholder="127.0.0.1:9090" disabled />
             </div>
             <div className={styles.modalField}>
-              <label>Local Binding Port:</label>
+              <label>Local Binding Port [STUB]:</label>
               <input type="text" placeholder="0 (Auto-assigned)" disabled />
             </div>
-            <p className={styles.stubNotice}>Network runtime options can be modified in config.toml</p>
+            <div className={styles.modalField}>
+              <label>Network Protocol [STUB]:</label>
+              <input type="text" placeholder="QUIC over UDP" disabled />
+            </div>
+
+            <p className={styles.stubNotice}>Network runtime options can be modified in config.toml [STUB]</p>
+
             <button onClick={() => (showSettingsModal.value = false)} className={styles.closeModalBtn}>
               Close
             </button>
