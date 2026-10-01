@@ -13,3 +13,8 @@ thiserror = "2.0"
 hex = "0.4"
 ed25519-dalek.workspace = true
 rand.workspace = true
+
+[[bench]]
+name = "crypto_benches"
+harness = false
+path = "../../benches/crates-bench/protocol/lib.rs"

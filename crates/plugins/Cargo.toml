@@ -6,3 +6,7 @@ edition = "2021"
 [dependencies]
 
 
+[[bench]]
+name = "crypto_benches"
+harness = false
+path = "../../benches/crates-bench/plugins/lib.rs"

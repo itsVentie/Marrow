@@ -17,3 +17,8 @@ hex.workspace = true
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand.workspace = true
+
+[[bench]]
+name = "crypto_benches"
+harness = false
+path = "../../benches/crates-bench/relay/lib.rs"
