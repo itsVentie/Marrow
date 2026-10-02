@@ -2,14 +2,11 @@ use crate::dto::{KeyFileInfoDto, PublicIdentityDto};
 use crate::network::event_loop::{handle_hole_punch_success, handle_network_frame};
 use crate::network::{derive_network_keypair, map_err_str};
 use crate::state::AppState;
-
 use r_crypto::Identity;
 use r_network::{NetworkEvent, NetworkNode};
 use r_storage::SearchIndex;
-
 use std::fs;
 use std::path::PathBuf;
-
 use tauri::{Manager, State};
 
 fn sanitize_filename(name: &str) -> String {
@@ -20,12 +17,9 @@ fn sanitize_filename(name: &str) -> String {
 
 fn derive_db_key(identity: &Identity) -> [u8; 32] {
     let mut key = [0u8; 32];
-
     let secret_bytes = identity.secret_bytes();
     let len = secret_bytes.len().min(32);
-
     key[..len].copy_from_slice(&secret_bytes[..len]);
-
     key
 }
 
@@ -45,6 +39,47 @@ fn ensure_search_index(
 
         *search_guard = Some(search);
     }
+
+    Ok(())
+}
+
+fn initialize_network(
+    app_handle: &tauri::AppHandle,
+    state: &AppState,
+    identity: &Identity,
+) -> Result<(), String> {
+    {
+        let cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
+
+        if cmd_guard.is_some() {
+            return Err("Network runtime is already initialized".into());
+        }
+    }
+
+    let keypair = derive_network_keypair(identity)?;
+
+    let (node, cmd_tx, mut event_rx) = NetworkNode::new(keypair).map_err(map_err_str)?;
+
+    tauri::async_runtime::spawn(node.run());
+
+    let handle_clone = app_handle.clone();
+
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = event_rx.recv().await {
+            match event {
+                NetworkEvent::FrameReceived { peer_id, data } => {
+                    handle_network_frame(handle_clone.clone(), peer_id.to_string(), data).await;
+                }
+
+                NetworkEvent::HolePunchSuccessful { peer_id } => {
+                    handle_hole_punch_success(handle_clone.clone(), peer_id.to_string());
+                }
+            }
+        }
+    });
+
+    let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
+    *cmd_guard = Some(cmd_tx);
 
     Ok(())
 }
@@ -136,11 +171,15 @@ pub fn create_identity(
         *identity_guard = Some(identity);
     }
 
-    /*
-     * SearchIndex должен создаваться только после того,
-     * как identity создана и из неё получен стабильный ключ.
-     */
     ensure_search_index(&app_handle, &state, db_key)?;
+
+    {
+        let identity_guard = state.identity.lock().map_err(map_err_str)?;
+
+        let identity = identity_guard.as_ref().ok_or("Identity not initialized")?;
+
+        initialize_network(&app_handle, &state, identity)?;
+    }
 
     Ok(PublicIdentityDto { pubkey_hex })
 }
@@ -178,31 +217,7 @@ pub fn unlock_identity_from_file(
      */
     ensure_search_index(&app_handle, &state, db_key)?;
 
-    let keypair = derive_network_keypair(&identity)?;
-
-    if let Ok((node, cmd_tx, mut event_rx)) = NetworkNode::new(keypair) {
-        tauri::async_runtime::spawn(node.run());
-
-        let handle_clone = app_handle.clone();
-
-        tauri::async_runtime::spawn(async move {
-            while let Some(event) = event_rx.recv().await {
-                match event {
-                    NetworkEvent::FrameReceived { peer_id, data } => {
-                        handle_network_frame(handle_clone.clone(), peer_id.to_string(), data).await;
-                    }
-
-                    NetworkEvent::HolePunchSuccessful { peer_id } => {
-                        handle_hole_punch_success(handle_clone.clone(), peer_id.to_string());
-                    }
-                }
-            }
-        });
-
-        let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
-
-        *cmd_guard = Some(cmd_tx);
-    }
+    initialize_network(&app_handle, &state, &identity)?;
 
     {
         let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
