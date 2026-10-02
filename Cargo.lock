@@ -4714,7 +4714,7 @@ dependencies = [
  "serde",
  "sha2",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.19",
  "tokio",
  "x25519-dalek",
  "zeroize",
@@ -4743,7 +4743,7 @@ dependencies = [
  "r-crypto",
  "r-protocol",
  "serde",
- "thiserror 1.0.69",
+ "thiserror 2.0.19",
  "tokio",
  "tokio-util",
  "tracing",
@@ -4800,7 +4800,7 @@ dependencies = [
  "sha2",
  "tantivy",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.19",
  "zeroize",
 ]
 
