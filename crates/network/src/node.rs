@@ -5,9 +5,7 @@ use libp2p::{
     autonat, dcutr, identify, identity,
     kad::{store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
     ping,
-    request_response::{
-        Behaviour as RequestResponse, Config as ReqRespConfig, ProtocolSupport,
-    },
+    request_response::{Behaviour as RequestResponse, Config as ReqRespConfig, ProtocolSupport},
     swarm::SwarmEvent,
     Multiaddr, PeerId, StreamProtocol, Swarm,
 };
@@ -42,8 +40,22 @@ pub enum NetworkCommand {
 
 #[derive(Debug)]
 pub enum NetworkEvent {
-    FrameReceived { peer_id: PeerId, data: Vec<u8> },
-    HolePunchSuccessful { peer_id: PeerId },
+    FrameReceived {
+        peer_id: PeerId,
+        data: Vec<u8>,
+    },
+    HolePunchSuccessful {
+        peer_id: PeerId,
+    },
+    Listening {
+        address: Multiaddr,
+    },
+    ConnectionEstablished {
+        peer_id: PeerId,
+    },
+    ConnectionClosed {
+        peer_id: PeerId,
+    },
 }
 
 type PendingResponseResult = Result<Vec<u8>, Box<dyn Error + Send + Sync>>;
@@ -88,8 +100,7 @@ impl NetworkNode {
                 let proto = StreamProtocol::new("/marrow/kad/1.0.0");
                 let kad_config = KademliaConfig::new(proto);
                 let store = MemoryStore::new(local_peer_id);
-                let kademlia =
-                    Kademlia::with_config(local_peer_id, store, kad_config);
+                let kademlia = Kademlia::with_config(local_peer_id, store, kad_config);
 
                 let identify = identify::Behaviour::new(identify::Config::new(
                     "/marrow/1.0.0".to_string(),
@@ -118,9 +129,7 @@ impl NetworkNode {
                     req_resp,
                 }
             })?
-            .with_swarm_config(|c| {
-                c.with_idle_connection_timeout(Duration::from_secs(60))
-            })
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
 
         let (cmd_tx, cmd_rx) = mpsc::channel(32);
@@ -224,11 +233,29 @@ impl NetworkNode {
         }
     }
 
-    async fn handle_swarm_event(
-        &mut self,
-        event: SwarmEvent<MarrowBehaviourEvent>,
-    ) {
+    async fn handle_swarm_event(&mut self, event: SwarmEvent<MarrowBehaviourEvent>) {
         match event {
+            SwarmEvent::NewListenAddr { address, .. } => {
+                let _ = self
+                    .event_sender
+                    .send(NetworkEvent::Listening { address })
+                    .await;
+            }
+
+            SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                let _ = self
+                    .event_sender
+                    .send(NetworkEvent::ConnectionEstablished { peer_id })
+                    .await;
+            }
+
+            SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                let _ = self
+                    .event_sender
+                    .send(NetworkEvent::ConnectionClosed { peer_id })
+                    .await;
+            }
+
             SwarmEvent::Behaviour(MarrowBehaviourEvent::ReqResp(
                 libp2p::request_response::Event::Message { peer, message },
             )) => match message {
@@ -262,12 +289,10 @@ impl NetworkNode {
                 }
             },
 
-            SwarmEvent::Behaviour(MarrowBehaviourEvent::Dcutr(
-                dcutr::Event {
-                    remote_peer_id,
-                    result: Ok(_),
-                },
-            )) => {
+            SwarmEvent::Behaviour(MarrowBehaviourEvent::Dcutr(dcutr::Event {
+                remote_peer_id,
+                result: Ok(_),
+            })) => {
                 let _ = self
                     .event_sender
                     .send(NetworkEvent::HolePunchSuccessful {

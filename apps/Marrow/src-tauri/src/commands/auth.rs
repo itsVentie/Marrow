@@ -64,19 +64,39 @@ fn initialize_network(
 
     let handle_clone = app_handle.clone();
 
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = event_rx.recv().await {
-            match event {
-                NetworkEvent::FrameReceived { peer_id, data } => {
-                    handle_network_frame(handle_clone.clone(), peer_id.to_string(), data).await;
-                }
+tauri::async_runtime::spawn(async move {
+    while let Some(event) = event_rx.recv().await {
+        match event {
+            NetworkEvent::FrameReceived { peer_id, data } => {
+                handle_network_frame(
+                    handle_clone.clone(),
+                    peer_id.to_string(),
+                    data,
+                )
+                .await;
+            }
 
-                NetworkEvent::HolePunchSuccessful { peer_id } => {
-                    handle_hole_punch_success(handle_clone.clone(), peer_id.to_string());
-                }
+            NetworkEvent::HolePunchSuccessful { peer_id } => {
+                handle_hole_punch_success(
+                    handle_clone.clone(),
+                    peer_id.to_string(),
+                );
+            }
+
+            NetworkEvent::Listening { address } => {
+                println!("Network listening on {address}");
+            }
+
+            NetworkEvent::ConnectionEstablished { peer_id } => {
+                println!("Network connection established with {peer_id}");
+            }
+
+            NetworkEvent::ConnectionClosed { peer_id } => {
+                println!("Network connection closed with {peer_id}");
             }
         }
-    });
+    }
+});
 
     let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
     *cmd_guard = Some(cmd_tx);
