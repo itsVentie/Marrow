@@ -1,13 +1,17 @@
 use crate::behaviour::{MarrowBehaviour, MarrowBehaviourEvent};
 use crate::codec::{MarrowProtocol, MarrowRequest, MarrowResponse};
+
 use libp2p::{
     autonat, dcutr, identify, identity,
     kad::{store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
     ping,
-    request_response::{Behaviour as RequestResponse, Config as ReqRespConfig, ProtocolSupport},
+    request_response::{
+        Behaviour as RequestResponse, Config as ReqRespConfig, ProtocolSupport,
+    },
     swarm::SwarmEvent,
     Multiaddr, PeerId, StreamProtocol, Swarm,
 };
+
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::Duration;
@@ -42,27 +46,29 @@ pub enum NetworkEvent {
     HolePunchSuccessful { peer_id: PeerId },
 }
 
+type PendingResponseResult = Result<Vec<u8>, Box<dyn Error + Send + Sync>>;
+type PendingResponseSender = oneshot::Sender<PendingResponseResult>;
+type PendingResponses =
+    HashMap<libp2p::request_response::OutboundRequestId, PendingResponseSender>;
+
+type NetworkInitResult = Result<
+    (
+        NetworkNode,
+        mpsc::Sender<NetworkCommand>,
+        mpsc::Receiver<NetworkEvent>,
+    ),
+    Box<dyn Error>,
+>;
+
 pub struct NetworkNode {
     swarm: Swarm<MarrowBehaviour>,
     command_receiver: mpsc::Receiver<NetworkCommand>,
     event_sender: mpsc::Sender<NetworkEvent>,
-    pending_responses: HashMap<
-        libp2p::request_response::OutboundRequestId,
-        oneshot::Sender<Result<Vec<u8>, Box<dyn Error + Send + Sync>>>,
-    >,
+    pending_responses: PendingResponses,
 }
 
 impl NetworkNode {
-    pub fn new(
-        keypair: identity::Keypair,
-    ) -> Result<
-        (
-            Self,
-            mpsc::Sender<NetworkCommand>,
-            mpsc::Receiver<NetworkEvent>,
-        ),
-        Box<dyn Error>,
-    > {
+    pub fn new(keypair: identity::Keypair) -> NetworkInitResult {
         let local_peer_id = PeerId::from(keypair.public());
 
         let swarm = libp2p::SwarmBuilder::with_existing_identity(keypair)
@@ -74,12 +80,16 @@ impl NetworkNode {
             )?
             .with_quic()
             .with_dns()?
-            .with_relay_client(libp2p::noise::Config::new, libp2p::yamux::Config::default)?
+            .with_relay_client(
+                libp2p::noise::Config::new,
+                libp2p::yamux::Config::default,
+            )?
             .with_behaviour(|key, relay_behaviour| {
                 let proto = StreamProtocol::new("/marrow/kad/1.0.0");
                 let kad_config = KademliaConfig::new(proto);
                 let store = MemoryStore::new(local_peer_id);
-                let kademlia = Kademlia::with_config(local_peer_id, store, kad_config);
+                let kademlia =
+                    Kademlia::with_config(local_peer_id, store, kad_config);
 
                 let identify = identify::Behaviour::new(identify::Config::new(
                     "/marrow/1.0.0".to_string(),
@@ -87,7 +97,10 @@ impl NetworkNode {
                 ));
 
                 let ping = ping::Behaviour::new(ping::Config::default());
-                let autonat = autonat::Behaviour::new(local_peer_id, autonat::Config::default());
+
+                let autonat =
+                    autonat::Behaviour::new(local_peer_id, autonat::Config::default());
+
                 let dcutr_behaviour = dcutr::Behaviour::new(local_peer_id);
 
                 let req_resp = RequestResponse::new(
@@ -105,7 +118,9 @@ impl NetworkNode {
                     req_resp,
                 }
             })?
-            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+            .with_swarm_config(|c| {
+                c.with_idle_connection_timeout(Duration::from_secs(60))
+            })
             .build();
 
         let (cmd_tx, cmd_rx) = mpsc::channel(32);
@@ -123,9 +138,13 @@ impl NetworkNode {
 
     pub async fn run(mut self) {
         use futures::StreamExt;
+
         loop {
             tokio::select! {
-                event = self.swarm.select_next_some() => self.handle_swarm_event(event).await,
+                event = self.swarm.select_next_some() => {
+                    self.handle_swarm_event(event).await
+                }
+
                 command = self.command_receiver.recv() => {
                     match command {
                         Some(cmd) => self.handle_command(cmd).await,
@@ -144,8 +163,10 @@ impl NetworkNode {
                     .listen_on(addr)
                     .map(|_| ())
                     .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>);
+
                 let _ = sender.send(res);
             }
+
             NetworkCommand::Dial {
                 peer_id,
                 addr,
@@ -155,12 +176,15 @@ impl NetworkNode {
                     .behaviour_mut()
                     .kademlia
                     .add_address(&peer_id, addr.clone());
+
                 let res = self
                     .swarm
                     .dial(addr)
                     .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>);
+
                 let _ = sender.send(res);
             }
+
             NetworkCommand::SendFrame {
                 peer_id,
                 data,
@@ -171,8 +195,10 @@ impl NetworkNode {
                     .behaviour_mut()
                     .req_resp
                     .send_request(&peer_id, MarrowRequest(data));
+
                 self.pending_responses.insert(req_id, sender);
             }
+
             NetworkCommand::ListenRelay {
                 relay_peer_id,
                 relay_addr,
@@ -182,20 +208,26 @@ impl NetworkNode {
                     .behaviour_mut()
                     .kademlia
                     .add_address(&relay_peer_id, relay_addr.clone());
+
                 let circuit_addr = relay_addr
                     .with(libp2p::multiaddr::Protocol::P2p(relay_peer_id))
                     .with(libp2p::multiaddr::Protocol::P2pCircuit);
+
                 let res = self
                     .swarm
                     .listen_on(circuit_addr)
                     .map(|_| ())
                     .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>);
+
                 let _ = sender.send(res);
             }
         }
     }
 
-    async fn handle_swarm_event(&mut self, event: SwarmEvent<MarrowBehaviourEvent>) {
+    async fn handle_swarm_event(
+        &mut self,
+        event: SwarmEvent<MarrowBehaviourEvent>,
+    ) {
         match event {
             SwarmEvent::Behaviour(MarrowBehaviourEvent::ReqResp(
                 libp2p::request_response::Event::Message { peer, message },
@@ -212,12 +244,14 @@ impl NetworkNode {
                             data: request.0,
                         })
                         .await;
+
                     let _ = self
                         .swarm
                         .behaviour_mut()
                         .req_resp
                         .send_response(channel, MarrowResponse(vec![1]));
                 }
+
                 libp2p::request_response::Message::Response {
                     request_id,
                     response,
@@ -227,10 +261,13 @@ impl NetworkNode {
                     }
                 }
             },
-            SwarmEvent::Behaviour(MarrowBehaviourEvent::Dcutr(dcutr::Event {
-                remote_peer_id,
-                result: Ok(_),
-            })) => {
+
+            SwarmEvent::Behaviour(MarrowBehaviourEvent::Dcutr(
+                dcutr::Event {
+                    remote_peer_id,
+                    result: Ok(_),
+                },
+            )) => {
                 let _ = self
                     .event_sender
                     .send(NetworkEvent::HolePunchSuccessful {
@@ -238,6 +275,7 @@ impl NetworkNode {
                     })
                     .await;
             }
+
             _ => {}
         }
     }

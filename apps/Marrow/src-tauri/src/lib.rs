@@ -4,7 +4,7 @@ mod network;
 mod state;
 mod tray;
 
-use r_storage::{SearchIndex, StorageEngine};
+use r_storage::StorageEngine;
 use state::AppState;
 use tauri::Manager;
 

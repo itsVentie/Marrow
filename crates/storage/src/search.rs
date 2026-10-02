@@ -59,24 +59,19 @@ impl SearchIndex {
     ) -> Result<Self, SearchError> {
         let mut schema_builder = Schema::builder();
 
-        let msg_id_field =
-            schema_builder.add_text_field("msg_id", STRING | STORED);
+        let msg_id_field = schema_builder.add_text_field("msg_id", STRING | STORED);
 
-        let peer_id_field =
-            schema_builder.add_text_field("peer_id", STRING | STORED);
+        let peer_id_field = schema_builder.add_text_field("peer_id", STRING | STORED);
 
-        let timestamp_field =
-            schema_builder.add_u64_field("timestamp", FAST | STORED);
+        let timestamp_field = schema_builder.add_u64_field("timestamp", FAST | STORED);
 
         let content_indexing = TextFieldIndexing::default()
             .set_tokenizer("search_hmac")
             .set_index_option(IndexRecordOption::WithFreqsAndPositions);
 
-        let content_options =
-            TextOptions::default().set_indexing_options(content_indexing);
+        let content_options = TextOptions::default().set_indexing_options(content_indexing);
 
-        let content_field =
-            schema_builder.add_text_field("content", content_options);
+        let content_field = schema_builder.add_text_field("content", content_options);
 
         let schema = schema_builder.build();
 
@@ -87,8 +82,8 @@ impl SearchIndex {
         let index = Index::open_or_create(dir, schema)?;
 
         index.tokenizers().register(
-    "search_hmac",
-    TextAnalyzer::builder(SimpleTokenizer::default()).build(),
+            "search_hmac",
+            TextAnalyzer::builder(SimpleTokenizer::default()).build(),
         );
 
         let reader = index
@@ -114,8 +109,7 @@ impl SearchIndex {
         timestamp: u64,
         content: &str,
     ) -> Result<(), SearchError> {
-        let mut writer: IndexWriter =
-            self.index.writer(INDEX_WRITER_MEMORY_BYTES)?;
+        let mut writer: IndexWriter = self.index.writer(INDEX_WRITER_MEMORY_BYTES)?;
 
         let hashed_content = self.hash_content(content);
 
@@ -134,11 +128,7 @@ impl SearchIndex {
         Ok(())
     }
 
-    pub fn search(
-        &self,
-        query_str: &str,
-        limit: usize,
-    ) -> Result<Vec<SearchResult>, SearchError> {
+    pub fn search(&self, query_str: &str, limit: usize) -> Result<Vec<SearchResult>, SearchError> {
         if query_str.trim().is_empty() || limit == 0 {
             return Ok(Vec::new());
         }
@@ -149,8 +139,7 @@ impl SearchIndex {
             return Ok(Vec::new());
         }
 
-        let hashed_tokens: Vec<&str> =
-            hashed_query.split_whitespace().collect();
+        let hashed_tokens: Vec<&str> = hashed_query.split_whitespace().collect();
 
         if hashed_tokens.is_empty() {
             return Ok(Vec::new());
@@ -159,13 +148,9 @@ impl SearchIndex {
         let clauses = hashed_tokens
             .into_iter()
             .map(|hashed_token| {
-                let term =
-                    Term::from_field_text(self.content_field, hashed_token);
+                let term = Term::from_field_text(self.content_field, hashed_token);
 
-                let query = TermQuery::new(
-                    term,
-                    IndexRecordOption::WithFreqsAndPositions,
-                );
+                let query = TermQuery::new(term, IndexRecordOption::WithFreqsAndPositions);
 
                 (
                     Occur::Must,
@@ -178,35 +163,28 @@ impl SearchIndex {
 
         let searcher = self.reader.searcher();
 
-        let top_docs =
-            searcher.search(&query, &TopDocs::with_limit(limit))?;
+        let top_docs = searcher.search(&query, &TopDocs::with_limit(limit))?;
 
         let mut results = Vec::with_capacity(top_docs.len());
 
         for (_score, doc_address) in top_docs {
-            let retrieved_doc: tantivy::TantivyDocument =
-                searcher.doc(doc_address)?;
+            let retrieved_doc: tantivy::TantivyDocument = searcher.doc(doc_address)?;
 
-            let extract_str =
-                |value: Option<&OwnedValue>| match value {
-                    Some(OwnedValue::Str(s)) => s.clone(),
-                    _ => String::new(),
-                };
+            let extract_str = |value: Option<&OwnedValue>| match value {
+                Some(OwnedValue::Str(s)) => s.clone(),
+                _ => String::new(),
+            };
 
-            let extract_u64 =
-                |value: Option<&OwnedValue>| match value {
-                    Some(OwnedValue::U64(v)) => *v,
-                    _ => 0,
-                };
+            let extract_u64 = |value: Option<&OwnedValue>| match value {
+                Some(OwnedValue::U64(v)) => *v,
+                _ => 0,
+            };
 
-            let msg_id =
-                extract_str(retrieved_doc.get_first(self.msg_id_field));
+            let msg_id = extract_str(retrieved_doc.get_first(self.msg_id_field));
 
-            let peer_id =
-                extract_str(retrieved_doc.get_first(self.peer_id_field));
+            let peer_id = extract_str(retrieved_doc.get_first(self.peer_id_field));
 
-            let timestamp =
-                extract_u64(retrieved_doc.get_first(self.timestamp_field));
+            let timestamp = extract_u64(retrieved_doc.get_first(self.timestamp_field));
 
             results.push(SearchResult {
                 msg_id,
@@ -219,12 +197,10 @@ impl SearchIndex {
     }
 
     fn hash_content(&self, content: &str) -> String {
-        let mut analyzer = TextAnalyzer::builder(
-            SimpleTokenizer::default(),
-        )
-        .filter(RemoveLongFilter::limit(40))
-        .filter(LowerCaser)
-        .build();
+        let mut analyzer = TextAnalyzer::builder(SimpleTokenizer::default())
+            .filter(RemoveLongFilter::limit(40))
+            .filter(LowerCaser)
+            .build();
 
         let mut stream = analyzer.token_stream(content);
 
@@ -256,8 +232,7 @@ impl SearchIndex {
         for byte in digest {
             use std::fmt::Write;
 
-            write!(&mut output, "{byte:02x}")
-                .expect("writing to String cannot fail");
+            write!(&mut output, "{byte:02x}").expect("writing to String cannot fail");
         }
 
         output
@@ -277,36 +252,23 @@ mod tests {
     fn test_search_index_basic() {
         let dir = tempdir().unwrap();
 
-        let search_index =
-            SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
+        let search_index = SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
 
         search_index
-            .index_message(
-                "msg1",
-                "peer_Ventie",
-                1000,
-                "Hello post quantum world",
-            )
+            .index_message("msg1", "peer_Ventie", 1000, "Hello post quantum world")
             .unwrap();
 
         search_index
-            .index_message(
-                "msg2",
-                "peer_bob",
-                1001,
-                "Secret handshake completed",
-            )
+            .index_message("msg2", "peer_bob", 1001, "Secret handshake completed")
             .unwrap();
 
-        let results =
-            search_index.search("quantum", 10).unwrap();
+        let results = search_index.search("quantum", 10).unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].msg_id, "msg1");
         assert_eq!(results[0].peer_id, "peer_Ventie");
 
-        let results_handshake =
-            search_index.search("handshake", 10).unwrap();
+        let results_handshake = search_index.search("handshake", 10).unwrap();
 
         assert_eq!(results_handshake.len(), 1);
         assert_eq!(results_handshake[0].msg_id, "msg2");
@@ -316,20 +278,13 @@ mod tests {
     fn test_search_is_case_insensitive() {
         let dir = tempdir().unwrap();
 
-        let search_index =
-            SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
+        let search_index = SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
 
         search_index
-            .index_message(
-                "msg1",
-                "peer_alice",
-                1000,
-                "Post Quantum Cryptography",
-            )
+            .index_message("msg1", "peer_alice", 1000, "Post Quantum Cryptography")
             .unwrap();
 
-        let results =
-            search_index.search("QUANTUM", 10).unwrap();
+        let results = search_index.search("QUANTUM", 10).unwrap();
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].msg_id, "msg1");
@@ -339,29 +294,18 @@ mod tests {
     fn test_search_requires_same_key() {
         let dir = tempdir().unwrap();
 
-        let index =
-            SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
+        let index = SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
 
         index
-            .index_message(
-                "msg1",
-                "peer_alice",
-                1000,
-                "secret quantum message",
-            )
+            .index_message("msg1", "peer_alice", 1000, "secret quantum message")
             .unwrap();
 
         let different_key = [0x99; 32];
 
         let other_index =
-            SearchIndex::open_or_create(
-                dir.path().join("other"),
-                different_key,
-            )
-            .unwrap();
+            SearchIndex::open_or_create(dir.path().join("other"), different_key).unwrap();
 
-        let results =
-            other_index.search("quantum", 10).unwrap();
+        let results = other_index.search("quantum", 10).unwrap();
 
         assert!(results.is_empty());
     }
@@ -370,54 +314,27 @@ mod tests {
     fn test_empty_query() {
         let dir = tempdir().unwrap();
 
-        let search_index =
-            SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
+        let search_index = SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
 
         search_index
-            .index_message(
-                "msg1",
-                "peer_alice",
-                1000,
-                "hello world",
-            )
+            .index_message("msg1", "peer_alice", 1000, "hello world")
             .unwrap();
 
-        assert!(
-            search_index
-                .search("", 10)
-                .unwrap()
-                .is_empty()
-        );
+        assert!(search_index.search("", 10).unwrap().is_empty());
 
-        assert!(
-            search_index
-                .search("   ", 10)
-                .unwrap()
-                .is_empty()
-        );
+        assert!(search_index.search("   ", 10).unwrap().is_empty());
     }
 
     #[test]
     fn test_zero_limit() {
         let dir = tempdir().unwrap();
 
-        let search_index =
-            SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
+        let search_index = SearchIndex::open_or_create(dir.path(), test_key()).unwrap();
 
         search_index
-            .index_message(
-                "msg1",
-                "peer_alice",
-                1000,
-                "hello world",
-            )
+            .index_message("msg1", "peer_alice", 1000, "hello world")
             .unwrap();
 
-        assert!(
-            search_index
-                .search("hello", 0)
-                .unwrap()
-                .is_empty()
-        );
+        assert!(search_index.search("hello", 0).unwrap().is_empty());
     }
 }
