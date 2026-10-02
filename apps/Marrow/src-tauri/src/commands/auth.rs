@@ -29,7 +29,11 @@ fn derive_db_key(identity: &Identity) -> [u8; 32] {
     key
 }
 
-fn ensure_search_index(app_handle: &tauri::AppHandle, state: &AppState) -> Result<(), String> {
+fn ensure_search_index(
+    app_handle: &tauri::AppHandle,
+    state: &AppState,
+    search_key: [u8; 32],
+) -> Result<(), String> {
     let app_dir = app_handle.path().app_data_dir().map_err(map_err_str)?;
 
     let search_path = app_dir.join("search_index");
@@ -37,7 +41,7 @@ fn ensure_search_index(app_handle: &tauri::AppHandle, state: &AppState) -> Resul
     let mut search_guard = state.search.lock().map_err(map_err_str)?;
 
     if search_guard.is_none() {
-        let search = SearchIndex::open_or_create(search_path).map_err(map_err_str)?;
+        let search = SearchIndex::open_or_create(search_path, search_key).map_err(map_err_str)?;
 
         *search_guard = Some(search);
     }
@@ -90,8 +94,6 @@ pub fn create_identity(
     app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<PublicIdentityDto, String> {
-    ensure_search_index(&app_handle, &state)?;
-
     let mut storage_guard = state.storage.lock().map_err(map_err_str)?;
 
     let storage = storage_guard.as_mut().ok_or("Storage not initialized")?;
@@ -109,6 +111,7 @@ pub fn create_identity(
     storage.save_vault(&vault).map_err(map_err_str)?;
 
     let pubkey_hex = identity.public_hex();
+
     let short_pubkey = &pubkey_hex[..8];
 
     let clean_alias = alias.as_deref().map(sanitize_filename).unwrap_or_default();
@@ -127,9 +130,17 @@ pub fn create_identity(
 
     fs::write(&file_path, bytes).map_err(map_err_str)?;
 
-    let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
+    {
+        let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
 
-    *identity_guard = Some(identity);
+        *identity_guard = Some(identity);
+    }
+
+    /*
+     * SearchIndex должен создаваться только после того,
+     * как identity создана и из неё получен стабильный ключ.
+     */
+    ensure_search_index(&app_handle, &state, db_key)?;
 
     Ok(PublicIdentityDto { pubkey_hex })
 }
@@ -141,8 +152,6 @@ pub fn unlock_identity_from_file(
     app_handle: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<PublicIdentityDto, String> {
-    ensure_search_index(&app_handle, &state)?;
-
     let bytes = fs::read(&file_path).map_err(map_err_str)?;
 
     let vault: r_crypto::EncryptedVault = bincode::deserialize(&bytes).map_err(map_err_str)?;
@@ -162,6 +171,12 @@ pub fn unlock_identity_from_file(
             storage.save_vault(&vault).map_err(map_err_str)?;
         }
     }
+
+    /*
+     * Инициализируем SearchIndex после успешной расшифровки
+     * identity и получения стабильного search key.
+     */
+    ensure_search_index(&app_handle, &state, db_key)?;
 
     let keypair = derive_network_keypair(&identity)?;
 
@@ -189,9 +204,11 @@ pub fn unlock_identity_from_file(
         *cmd_guard = Some(cmd_tx);
     }
 
-    let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
+    {
+        let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
 
-    *identity_guard = Some(identity);
+        *identity_guard = Some(identity);
+    }
 
     Ok(PublicIdentityDto { pubkey_hex })
 }

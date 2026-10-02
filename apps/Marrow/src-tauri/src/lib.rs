@@ -19,19 +19,12 @@ pub fn run() {
                 let _ = std::fs::create_dir_all(&app_dir);
 
                 let db_path = app_dir.join("marrow.redb");
-                let search_path = app_dir.join("search_index");
 
                 let state = app.state::<AppState>();
 
                 if let Ok(storage) = StorageEngine::open(&db_path) {
                     if let Ok(mut storage_guard) = state.storage.lock() {
                         *storage_guard = Some(storage);
-                    }
-                }
-
-                if let Ok(search) = SearchIndex::open_or_create(&search_path) {
-                    if let Ok(mut search_guard) = state.search.lock() {
-                        *search_guard = Some(search);
                     }
                 }
             }
