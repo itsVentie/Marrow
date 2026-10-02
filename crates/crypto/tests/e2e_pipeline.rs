@@ -43,20 +43,13 @@ fn test_e2e_handshake_frame_and_ratchet_pipeline() {
             )
             .expect("Failed to process init at responder");
 
-            let resp_payload = HandshakeResponsePayload::new(
-                anek_pubkey,
-                payload.sender_pubkey,
-                &resp_out,
-            );
+            let resp_payload =
+                HandshakeResponsePayload::new(anek_pubkey, payload.sender_pubkey, &resp_out);
 
             let responder_secret = resp_out.master_secret.0;
             let responder_dh_secret = resp_out.x25519_secret;
 
-            (
-                resp_payload,
-                responder_secret,
-                responder_dh_secret,
-            )
+            (resp_payload, responder_secret, responder_dh_secret)
         }
 
         _ => panic!("Expected HandshakeInit frame"),

@@ -8,6 +8,7 @@ struct HandshakeFixture {
     initiator: HandshakeInitiator,
     initiator_pubkey: [u8; 32],
     responder_pubkey: [u8; 32],
+    responder_sk: SigningKey,
     init: InitiatorOutput,
     response: ResponderOutput,
 }
@@ -37,6 +38,7 @@ fn build_handshake() -> HandshakeFixture {
         initiator,
         initiator_pubkey,
         responder_pubkey,
+        responder_sk,
         init,
         response,
     }
@@ -46,8 +48,8 @@ fn build_handshake() -> HandshakeFixture {
 fn test_authenticated_handshake_roundtrip() {
     let HandshakeFixture {
         initiator,
+        initiator_pubkey,
         responder_pubkey,
-        init,
         response,
         ..
     } = build_handshake();
@@ -55,7 +57,7 @@ fn test_authenticated_handshake_roundtrip() {
     let initiator_secret = initiator
         .process_response(
             &responder_pubkey,
-            &init.recipient_pubkey,
+            &initiator_pubkey,
             &response.x25519_public,
             &response.ml_kem_ciphertext,
             &response.signature,
@@ -72,7 +74,7 @@ fn test_authenticated_handshake_roundtrip() {
 fn test_wrong_init_recipient_rejected() {
     let HandshakeFixture {
         initiator_pubkey,
-        responder_pubkey,
+        responder_sk,
         init,
         ..
     } = build_handshake();
@@ -80,7 +82,7 @@ fn test_wrong_init_recipient_rejected() {
     let wrong_recipient = [0xA5; 32];
 
     let result = HandshakeResponder::process_init_and_respond(
-        &SigningKey::from_bytes(&responder_pubkey),
+        &responder_sk,
         &initiator_pubkey,
         &wrong_recipient,
         &init.x25519_public,
@@ -94,18 +96,14 @@ fn test_wrong_init_recipient_rejected() {
 #[test]
 fn test_init_sender_identity_substitution_rejected() {
     let HandshakeFixture {
-        responder_pubkey,
-        init,
-        ..
+        responder_sk, init, ..
     } = build_handshake();
 
     let attacker = SigningKey::generate(&mut OsRng);
     let attacker_pubkey = *attacker.verifying_key().as_bytes();
 
-    let responder = SigningKey::from_bytes(&responder_pubkey);
-
     let result = HandshakeResponder::process_init_and_respond(
-        &responder,
+        &responder_sk,
         &attacker_pubkey,
         &init.recipient_pubkey,
         &init.x25519_public,
@@ -120,7 +118,7 @@ fn test_init_sender_identity_substitution_rejected() {
 fn test_init_x25519_tampering_rejected() {
     let HandshakeFixture {
         initiator_pubkey,
-        responder_pubkey,
+        responder_sk,
         init,
         ..
     } = build_handshake();
@@ -128,10 +126,8 @@ fn test_init_x25519_tampering_rejected() {
     let mut tampered_x25519 = init.x25519_public;
     tampered_x25519[0] ^= 0x01;
 
-    let responder = SigningKey::from_bytes(&responder_pubkey);
-
     let result = HandshakeResponder::process_init_and_respond(
-        &responder,
+        &responder_sk,
         &initiator_pubkey,
         &init.recipient_pubkey,
         &tampered_x25519,
@@ -146,7 +142,7 @@ fn test_init_x25519_tampering_rejected() {
 fn test_init_ml_kem_tampering_rejected() {
     let HandshakeFixture {
         initiator_pubkey,
-        responder_pubkey,
+        responder_sk,
         init,
         ..
     } = build_handshake();
@@ -154,10 +150,8 @@ fn test_init_ml_kem_tampering_rejected() {
     let mut tampered_ml_kem = init.ml_kem_public.clone();
     tampered_ml_kem[0] ^= 0x01;
 
-    let responder = SigningKey::from_bytes(&responder_pubkey);
-
     let result = HandshakeResponder::process_init_and_respond(
-        &responder,
+        &responder_sk,
         &initiator_pubkey,
         &init.recipient_pubkey,
         &init.x25519_public,
@@ -172,17 +166,15 @@ fn test_init_ml_kem_tampering_rejected() {
 fn test_init_malformed_ml_kem_key_length_rejected() {
     let HandshakeFixture {
         initiator_pubkey,
-        responder_pubkey,
+        responder_sk,
         init,
         ..
     } = build_handshake();
 
     let malformed_ml_kem = &init.ml_kem_public[..init.ml_kem_public.len() - 1];
 
-    let responder = SigningKey::from_bytes(&responder_pubkey);
-
     let result = HandshakeResponder::process_init_and_respond(
-        &responder,
+        &responder_sk,
         &initiator_pubkey,
         &init.recipient_pubkey,
         &init.x25519_public,
@@ -197,17 +189,15 @@ fn test_init_malformed_ml_kem_key_length_rejected() {
 fn test_init_malformed_signature_rejected() {
     let HandshakeFixture {
         initiator_pubkey,
-        responder_pubkey,
+        responder_sk,
         init,
         ..
     } = build_handshake();
 
     let malformed_signature = &init.signature[..63];
 
-    let responder = SigningKey::from_bytes(&responder_pubkey);
-
     let result = HandshakeResponder::process_init_and_respond(
-        &responder,
+        &responder_sk,
         &initiator_pubkey,
         &init.recipient_pubkey,
         &init.x25519_public,
@@ -222,7 +212,7 @@ fn test_init_malformed_signature_rejected() {
 fn test_response_identity_substitution_rejected() {
     let HandshakeFixture {
         initiator,
-        init,
+        initiator_pubkey,
         response,
         ..
     } = build_handshake();
@@ -232,7 +222,7 @@ fn test_response_identity_substitution_rejected() {
 
     let result = initiator.process_response(
         &attacker_pubkey,
-        &init.recipient_pubkey,
+        &initiator_pubkey,
         &response.x25519_public,
         &response.ml_kem_ciphertext,
         &response.signature,
@@ -260,18 +250,15 @@ fn test_response_recipient_substitution_rejected() {
         &response.signature,
     );
 
-    assert!(matches!(
-        result,
-        Err(HandshakeError::RecipientMismatch)
-    ));
+    assert!(matches!(result, Err(HandshakeError::RecipientMismatch)));
 }
 
 #[test]
 fn test_response_x25519_tampering_rejected() {
     let HandshakeFixture {
         initiator,
+        initiator_pubkey,
         responder_pubkey,
-        init,
         response,
         ..
     } = build_handshake();
@@ -281,7 +268,7 @@ fn test_response_x25519_tampering_rejected() {
 
     let result = initiator.process_response(
         &responder_pubkey,
-        &init.recipient_pubkey,
+        &initiator_pubkey,
         &tampered_x25519,
         &response.ml_kem_ciphertext,
         &response.signature,
@@ -294,8 +281,8 @@ fn test_response_x25519_tampering_rejected() {
 fn test_response_ml_kem_ciphertext_tampering_rejected() {
     let HandshakeFixture {
         initiator,
+        initiator_pubkey,
         responder_pubkey,
-        init,
         response,
         ..
     } = build_handshake();
@@ -305,7 +292,7 @@ fn test_response_ml_kem_ciphertext_tampering_rejected() {
 
     let result = initiator.process_response(
         &responder_pubkey,
-        &init.recipient_pubkey,
+        &initiator_pubkey,
         &response.x25519_public,
         &tampered_ciphertext,
         &response.signature,
@@ -318,8 +305,8 @@ fn test_response_ml_kem_ciphertext_tampering_rejected() {
 fn test_response_signature_tampering_rejected() {
     let HandshakeFixture {
         initiator,
+        initiator_pubkey,
         responder_pubkey,
-        init,
         response,
         ..
     } = build_handshake();
@@ -329,7 +316,7 @@ fn test_response_signature_tampering_rejected() {
 
     let result = initiator.process_response(
         &responder_pubkey,
-        &init.recipient_pubkey,
+        &initiator_pubkey,
         &response.x25519_public,
         &response.ml_kem_ciphertext,
         &tampered_signature,
@@ -342,8 +329,8 @@ fn test_response_signature_tampering_rejected() {
 fn test_response_malformed_ciphertext_length_rejected() {
     let HandshakeFixture {
         initiator,
+        initiator_pubkey,
         responder_pubkey,
-        init,
         response,
         ..
     } = build_handshake();
@@ -352,7 +339,7 @@ fn test_response_malformed_ciphertext_length_rejected() {
 
     let result = initiator.process_response(
         &responder_pubkey,
-        &init.recipient_pubkey,
+        &initiator_pubkey,
         &response.x25519_public,
         malformed_ciphertext,
         &response.signature,
@@ -368,8 +355,8 @@ fn test_response_malformed_ciphertext_length_rejected() {
 fn test_response_malformed_signature_rejected() {
     let HandshakeFixture {
         initiator,
+        initiator_pubkey,
         responder_pubkey,
-        init,
         response,
         ..
     } = build_handshake();
@@ -378,7 +365,7 @@ fn test_response_malformed_signature_rejected() {
 
     let result = initiator.process_response(
         &responder_pubkey,
-        &init.recipient_pubkey,
+        &initiator_pubkey,
         &response.x25519_public,
         &response.ml_kem_ciphertext,
         malformed_signature,
@@ -391,7 +378,7 @@ fn test_response_malformed_signature_rejected() {
 fn test_invalid_responder_identity_length_rejected() {
     let HandshakeFixture {
         initiator,
-        init,
+        initiator_pubkey,
         response,
         ..
     } = build_handshake();
@@ -400,7 +387,7 @@ fn test_invalid_responder_identity_length_rejected() {
 
     let result = initiator.process_response(
         &invalid_identity,
-        &init.recipient_pubkey,
+        &initiator_pubkey,
         &response.x25519_public,
         &response.ml_kem_ciphertext,
         &response.signature,

@@ -13,7 +13,6 @@ pub const ML_KEM_PK_SIZE: usize = 1184;
 pub const ML_KEM_CT_SIZE: usize = 1088;
 pub const SHARED_SECRET_SIZE: usize = 32;
 pub const ED25519_SIG_SIZE: usize = 64;
-
 pub const HANDSHAKE_VERSION: u8 = 1;
 pub const HANDSHAKE_SUITE: &[u8] = b"X25519-MLKEM768-ED25519-HKDF-SHA256";
 
@@ -64,7 +63,6 @@ pub struct HandshakeInitiator {
     x25519_public: X25519PublicKey,
     ml_kem_decapskey: DecapsulationKey<MlKem768Params>,
     ml_kem_encapskey: EncapsulationKey<MlKem768Params>,
-
     initiator_identity: Option<[u8; 32]>,
     responder_identity: Option<[u8; 32]>,
 }
@@ -86,6 +84,7 @@ impl HandshakeInitiator {
     pub fn new() -> Self {
         let x25519_secret = EphemeralSecret::random_from_rng(OsRng);
         let x25519_public = X25519PublicKey::from(&x25519_secret);
+
         let (ml_kem_decapskey, ml_kem_encapskey) = MlKem768::generate(&mut OsRng);
 
         Self {
@@ -291,7 +290,7 @@ impl HandshakeResponder {
         let response_transcript = build_response_transcript(
             &initiator_identity,
             &responder_identity,
-            &responder_identity,
+            &initiator_identity,
             initiator_x25519_pk_bytes,
             my_x25519_public.as_bytes(),
             initiator_ml_kem_pk_bytes,
@@ -406,6 +405,7 @@ mod tests {
     #[test]
     fn test_handshake_roundtrip() {
         let initiator_identity = SigningKey::generate(&mut OsRng);
+
         let responder_identity = SigningKey::generate(&mut OsRng);
 
         let responder_pubkey = *responder_identity.verifying_key().as_bytes();
@@ -447,6 +447,7 @@ mod tests {
     #[test]
     fn test_full_handshake_roundtrip() {
         let initiator_identity = SigningKey::generate(&mut OsRng);
+
         let responder_identity = SigningKey::generate(&mut OsRng);
 
         let initiator_pubkey = *initiator_identity.verifying_key().as_bytes();
@@ -470,7 +471,7 @@ mod tests {
         let initiator_secret = initiator
             .process_response(
                 &responder_pubkey,
-                &init_output.recipient_pubkey,
+                &initiator_pubkey,
                 &responder_output.x25519_public,
                 &responder_output.ml_kem_ciphertext,
                 &responder_output.signature,
@@ -483,7 +484,9 @@ mod tests {
     #[test]
     fn test_wrong_recipient_rejected() {
         let initiator_identity = SigningKey::generate(&mut OsRng);
+
         let responder_identity = SigningKey::generate(&mut OsRng);
+
         let wrong_identity = SigningKey::generate(&mut OsRng);
 
         let responder_pubkey = *responder_identity.verifying_key().as_bytes();
@@ -513,7 +516,9 @@ mod tests {
     #[test]
     fn test_response_identity_substitution_rejected() {
         let initiator_identity = SigningKey::generate(&mut OsRng);
+
         let responder_identity = SigningKey::generate(&mut OsRng);
+
         let attacker_identity = SigningKey::generate(&mut OsRng);
 
         let responder_pubkey = *responder_identity.verifying_key().as_bytes();
@@ -550,6 +555,7 @@ mod tests {
     #[test]
     fn test_init_signature_tampering_rejected() {
         let initiator_identity = SigningKey::generate(&mut OsRng);
+
         let responder_identity = SigningKey::generate(&mut OsRng);
 
         let responder_pubkey = *responder_identity.verifying_key().as_bytes();
@@ -578,6 +584,7 @@ mod tests {
     #[test]
     fn test_non_contributory_x25519_rejected() {
         let initiator_identity = SigningKey::generate(&mut OsRng);
+
         let responder_identity = SigningKey::generate(&mut OsRng);
 
         let initiator_pubkey = *initiator_identity.verifying_key().as_bytes();
@@ -585,6 +592,7 @@ mod tests {
         let responder_pubkey = *responder_identity.verifying_key().as_bytes();
 
         let helper = HandshakeInitiator::new();
+
         let ml_kem_pk = helper.ml_kem_encapskey.as_bytes();
 
         let zero_x25519 = [0u8; 32];
