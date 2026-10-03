@@ -6,7 +6,7 @@ use crate::network::event_loop::{
 use crate::network::{derive_network_keypair, map_err_str};
 use crate::state::AppState;
 use r_crypto::Identity;
-use r_network::{NetworkEvent, NetworkNode};
+use r_network::{NetworkCommand, NetworkEvent, NetworkNode};
 use r_storage::SearchIndex;
 use std::fs;
 use std::path::PathBuf;
@@ -59,6 +59,10 @@ fn initialize_network(
         }
     }
 
+    let tcp_addr: libp2p::Multiaddr = "/ip4/0.0.0.0/tcp/0".parse().map_err(map_err_str)?;
+
+    let quic_addr: libp2p::Multiaddr = "/ip4/0.0.0.0/udp/0/quic-v1".parse().map_err(map_err_str)?;
+
     let keypair = derive_network_keypair(identity)?;
 
     let (node, cmd_tx, mut event_rx) = NetworkNode::new(keypair).map_err(map_err_str)?;
@@ -93,8 +97,38 @@ fn initialize_network(
         }
     });
 
-    let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
-    *cmd_guard = Some(cmd_tx);
+    {
+        let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
+        *cmd_guard = Some(cmd_tx.clone());
+    }
+
+    tauri::async_runtime::spawn(async move {
+        for addr in [tcp_addr, quic_addr] {
+            let (sender, receiver) = tokio::sync::oneshot::channel();
+
+            if let Err(err) = cmd_tx
+                .send(NetworkCommand::StartListening { addr, sender })
+                .await
+            {
+                eprintln!("Failed to request network listener startup: {err}");
+                return;
+            }
+
+            match receiver.await {
+                Ok(Ok(())) => {}
+
+                Ok(Err(err)) => {
+                    eprintln!("Failed to start network listener: {err}");
+                    return;
+                }
+
+                Err(err) => {
+                    eprintln!("Network listener startup response dropped: {err}");
+                    return;
+                }
+            }
+        }
+    });
 
     Ok(())
 }
@@ -228,12 +262,18 @@ pub fn unlock_identity_from_file(
 
     ensure_search_index(&app_handle, &state, db_key)?;
 
-    initialize_network(&app_handle, &state, &identity)?;
-
     {
         let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
 
         *identity_guard = Some(identity);
+    }
+
+    {
+        let identity_guard = state.identity.lock().map_err(map_err_str)?;
+
+        let identity = identity_guard.as_ref().ok_or("Identity not initialized")?;
+
+        initialize_network(&app_handle, &state, identity)?;
     }
 
     Ok(PublicIdentityDto { pubkey_hex })
