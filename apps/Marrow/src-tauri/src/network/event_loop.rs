@@ -8,11 +8,7 @@ use crate::dto::{DecryptedMessageDto, NetworkEventPayload};
 use crate::network::{parse_peer_pk_array, pubkey_hex_to_peer_id};
 use crate::state::{AppState, CryptoSession};
 
-pub async fn handle_network_frame(
-    handle: tauri::AppHandle,
-    peer_id: String,
-    data: Vec<u8>,
-) {
+pub async fn handle_network_frame(handle: tauri::AppHandle, peer_id: String, data: Vec<u8>) {
     let frame = match Frame::decode(&data) {
         Ok(frame) => frame,
         Err(_) => return,
@@ -22,7 +18,21 @@ pub async fn handle_network_frame(
 
     match frame {
         Frame::HandshakeInit(payload) => {
+            let transport_peer_id = match peer_id.parse::<libp2p::PeerId>() {
+                Ok(peer_id) => peer_id,
+                Err(_) => return,
+            };
+
             let sender_pubkey_hex = hex::encode(payload.sender_pubkey);
+
+            let expected_peer_id = match pubkey_hex_to_peer_id(&sender_pubkey_hex) {
+                Ok(peer_id) => peer_id,
+                Err(_) => return,
+            };
+
+            if transport_peer_id != expected_peer_id {
+                return;
+            }
 
             let responder_signing_key = {
                 let identity_guard = match state.identity.lock() {
@@ -65,11 +75,8 @@ pub async fn handle_network_frame(
                 Err(_) => return,
             };
 
-            let response_payload = HandshakeResponsePayload::new(
-                responder_pubkey,
-                payload.sender_pubkey,
-                &resp_out,
-            );
+            let response_payload =
+                HandshakeResponsePayload::new(responder_pubkey, payload.sender_pubkey, &resp_out);
 
             let response_frame = Frame::HandshakeResponse(response_payload);
 
@@ -97,22 +104,13 @@ pub async fn handle_network_frame(
                 );
             }
 
-            let sender_peer_id =
-                match pubkey_hex_to_peer_id(&sender_pubkey_hex) {
-                    Ok(peer_id) => peer_id,
-                    Err(_) => return,
-                };
-
             {
                 let mut mapping_guard = match state.peer_id_to_pubkey.lock() {
                     Ok(guard) => guard,
                     Err(_) => return,
                 };
 
-                mapping_guard.insert(
-                    sender_peer_id,
-                    sender_pubkey_hex.clone(),
-                );
+                mapping_guard.insert(transport_peer_id, sender_pubkey_hex.clone());
             }
 
             let now = std::time::SystemTime::now()
@@ -144,17 +142,11 @@ pub async fn handle_network_frame(
                 return;
             };
 
-            let target_peer_id =
-                match pubkey_hex_to_peer_id(&sender_pubkey_hex) {
-                    Ok(peer_id) => peer_id,
-                    Err(_) => return,
-                };
-
             let (oneshot_tx, _) = tokio::sync::oneshot::channel();
 
             let _ = tx
                 .send(NetworkCommand::SendFrame {
-                    peer_id: target_peer_id,
+                    peer_id: transport_peer_id,
                     data: encoded_response,
                     sender: oneshot_tx,
                 })
@@ -162,14 +154,27 @@ pub async fn handle_network_frame(
         }
 
         Frame::HandshakeResponse(payload) => {
+            let transport_peer_id = match peer_id.parse::<libp2p::PeerId>() {
+                Ok(peer_id) => peer_id,
+                Err(_) => return,
+            };
+
             let responder_pubkey_hex = hex::encode(payload.sender_pubkey);
 
+            let expected_peer_id = match pubkey_hex_to_peer_id(&responder_pubkey_hex) {
+                Ok(peer_id) => peer_id,
+                Err(_) => return,
+            };
+
+            if transport_peer_id != expected_peer_id {
+                return;
+            }
+
             let initiator = {
-                let mut pending_guard =
-                    match state.pending_handshakes.lock() {
-                        Ok(guard) => guard,
-                        Err(_) => return,
-                    };
+                let mut pending_guard = match state.pending_handshakes.lock() {
+                    Ok(guard) => guard,
+                    Err(_) => return,
+                };
 
                 match pending_guard.remove(&responder_pubkey_hex) {
                     Some(initiator) => initiator,
@@ -188,17 +193,13 @@ pub async fn handle_network_frame(
                 Err(_) => return,
             };
 
-            let peer_x25519_pk =
-                r_crypto::x25519_dalek::PublicKey::from(
-                    payload.ephemeral_x25519,
-                );
+            let peer_x25519_pk = r_crypto::x25519_dalek::PublicKey::from(payload.ephemeral_x25519);
 
             {
-                let mut sessions_guard =
-                    match state.crypto_sessions.lock() {
-                        Ok(guard) => guard,
-                        Err(_) => return,
-                    };
+                let mut sessions_guard = match state.crypto_sessions.lock() {
+                    Ok(guard) => guard,
+                    Err(_) => return,
+                };
 
                 sessions_guard.insert(
                     responder_pubkey_hex.clone(),
@@ -213,22 +214,13 @@ pub async fn handle_network_frame(
                 );
             }
 
-            let responder_peer_id =
-                match pubkey_hex_to_peer_id(&responder_pubkey_hex) {
-                    Ok(peer_id) => peer_id,
-                    Err(_) => return,
-                };
-
             {
                 let mut mapping_guard = match state.peer_id_to_pubkey.lock() {
                     Ok(guard) => guard,
                     Err(_) => return,
                 };
 
-                mapping_guard.insert(
-                    responder_peer_id,
-                    responder_pubkey_hex.clone(),
-                );
+                mapping_guard.insert(transport_peer_id, responder_pubkey_hex.clone());
             }
 
             let now = std::time::SystemTime::now()
@@ -243,25 +235,22 @@ pub async fn handle_network_frame(
                 };
 
                 if let Some(storage) = storage_guard.as_ref() {
-                    let _ =
-                        storage.create_session(&responder_pubkey_hex, now);
+                    let _ = storage.create_session(&responder_pubkey_hex, now);
                 }
             }
         }
 
         Frame::Message(payload) => {
-            let transport_peer_id =
-                match peer_id.parse::<libp2p::PeerId>() {
-                    Ok(peer_id) => peer_id,
-                    Err(_) => return,
-                };
+            let transport_peer_id = match peer_id.parse::<libp2p::PeerId>() {
+                Ok(peer_id) => peer_id,
+                Err(_) => return,
+            };
 
             let session_pubkey_hex = {
-                let mapping_guard =
-                    match state.peer_id_to_pubkey.lock() {
-                        Ok(guard) => guard,
-                        Err(_) => return,
-                    };
+                let mapping_guard = match state.peer_id_to_pubkey.lock() {
+                    Ok(guard) => guard,
+                    Err(_) => return,
+                };
 
                 match mapping_guard.get(&transport_peer_id) {
                     Some(pubkey_hex) => pubkey_hex.clone(),
@@ -269,34 +258,28 @@ pub async fn handle_network_frame(
                 }
             };
 
-            let mut sessions_guard =
-                match state.crypto_sessions.lock() {
-                    Ok(guard) => guard,
-                    Err(_) => return,
-                };
+            let mut sessions_guard = match state.crypto_sessions.lock() {
+                Ok(guard) => guard,
+                Err(_) => return,
+            };
 
-            let Some(session) =
-                sessions_guard.get_mut(&session_pubkey_hex)
-            else {
+            let Some(session) = sessions_guard.get_mut(&session_pubkey_hex) else {
                 return;
             };
 
             let ad = peer_id.as_bytes();
 
-            let encrypted_msg =
-                match bincode::deserialize::<
-                    r_crypto::ratchet::EncryptedMessage,
-                >(&payload.ciphertext)
-                {
-                    Ok(message) => message,
-                    Err(_) => return,
-                };
+            let encrypted_msg = match bincode::deserialize::<r_crypto::ratchet::EncryptedMessage>(
+                &payload.ciphertext,
+            ) {
+                Ok(message) => message,
+                Err(_) => return,
+            };
 
-            let plaintext_bytes =
-                match session.ratchet.decrypt(&encrypted_msg, ad) {
-                    Ok(plaintext) => plaintext,
-                    Err(_) => return,
-                };
+            let plaintext_bytes = match session.ratchet.decrypt(&encrypted_msg, ad) {
+                Ok(plaintext) => plaintext,
+                Err(_) => return,
+            };
 
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -323,10 +306,7 @@ pub async fn handle_network_frame(
 
                 if let Some(storage) = storage_guard.as_ref() {
                     let _ = storage.store_message(&stored_msg);
-                    let _ = storage.update_session_activity(
-                        &session_pubkey_hex,
-                        now,
-                    );
+                    let _ = storage.update_session_activity(&session_pubkey_hex, now);
                 }
             }
 
@@ -337,9 +317,7 @@ pub async fn handle_network_frame(
                 };
 
                 if let Some(search_index) = search_guard.as_ref() {
-                    if let Ok(text_content) =
-                        String::from_utf8(plaintext_bytes.clone())
-                    {
+                    if let Ok(text_content) = String::from_utf8(plaintext_bytes.clone()) {
                         let _ = search_index.index_message(
                             &msg_id,
                             &session_pubkey_hex,
@@ -363,17 +341,11 @@ pub async fn handle_network_frame(
             );
         }
 
-        Frame::Ack { .. }
-        | Frame::Ping
-        | Frame::Pong
-        | Frame::Dummy(_) => {}
+        Frame::Ack { .. } | Frame::Ping | Frame::Pong | Frame::Dummy(_) => {}
     }
 }
 
-pub fn handle_hole_punch_success(
-    handle: tauri::AppHandle,
-    peer_id: String,
-) {
+pub fn handle_hole_punch_success(handle: tauri::AppHandle, peer_id: String) {
     let _ = handle.emit(
         "network://hole_punch_success",
         NetworkEventPayload {
@@ -383,10 +355,7 @@ pub fn handle_hole_punch_success(
     );
 }
 
-pub fn handle_network_listening(
-    handle: tauri::AppHandle,
-    address: String,
-) {
+pub fn handle_network_listening(handle: tauri::AppHandle, address: String) {
     let _ = handle.emit(
         "network://listening",
         NetworkEventPayload {
@@ -396,10 +365,7 @@ pub fn handle_network_listening(
     );
 }
 
-pub fn handle_connection_established(
-    handle: tauri::AppHandle,
-    peer_id: String,
-) {
+pub fn handle_connection_established(handle: tauri::AppHandle, peer_id: String) {
     let _ = handle.emit(
         "network://connection_established",
         NetworkEventPayload {
@@ -409,10 +375,7 @@ pub fn handle_connection_established(
     );
 }
 
-pub fn handle_connection_closed(
-    handle: tauri::AppHandle,
-    peer_id: String,
-) {
+pub fn handle_connection_closed(handle: tauri::AppHandle, peer_id: String) {
     let _ = handle.emit(
         "network://connection_closed",
         NetworkEventPayload {
