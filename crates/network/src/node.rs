@@ -13,6 +13,7 @@ use libp2p::{
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::Duration;
+
 use tokio::sync::{mpsc, oneshot};
 
 #[derive(Debug)]
@@ -40,28 +41,16 @@ pub enum NetworkCommand {
 
 #[derive(Debug)]
 pub enum NetworkEvent {
-    FrameReceived {
-        peer_id: PeerId,
-        data: Vec<u8>,
-    },
-    HolePunchSuccessful {
-        peer_id: PeerId,
-    },
-    Listening {
-        address: Multiaddr,
-    },
-    ConnectionEstablished {
-        peer_id: PeerId,
-    },
-    ConnectionClosed {
-        peer_id: PeerId,
-    },
+    FrameReceived { peer_id: PeerId, data: Vec<u8> },
+    HolePunchSuccessful { peer_id: PeerId },
+    Listening { address: Multiaddr },
+    ConnectionEstablished { peer_id: PeerId },
+    ConnectionClosed { peer_id: PeerId },
 }
 
 type PendingResponseResult = Result<Vec<u8>, Box<dyn Error + Send + Sync>>;
 type PendingResponseSender = oneshot::Sender<PendingResponseResult>;
-type PendingResponses =
-    HashMap<libp2p::request_response::OutboundRequestId, PendingResponseSender>;
+type PendingResponses = HashMap<libp2p::request_response::OutboundRequestId, PendingResponseSender>;
 
 type NetworkInitResult = Result<
     (
@@ -92,14 +81,14 @@ impl NetworkNode {
             )?
             .with_quic()
             .with_dns()?
-            .with_relay_client(
-                libp2p::noise::Config::new,
-                libp2p::yamux::Config::default,
-            )?
+            .with_relay_client(libp2p::noise::Config::new, libp2p::yamux::Config::default)?
             .with_behaviour(|key, relay_behaviour| {
                 let proto = StreamProtocol::new("/marrow/kad/1.0.0");
+
                 let kad_config = KademliaConfig::new(proto);
+
                 let store = MemoryStore::new(local_peer_id);
+
                 let kademlia = Kademlia::with_config(local_peer_id, store, kad_config);
 
                 let identify = identify::Behaviour::new(identify::Config::new(
@@ -109,8 +98,7 @@ impl NetworkNode {
 
                 let ping = ping::Behaviour::new(ping::Config::default());
 
-                let autonat =
-                    autonat::Behaviour::new(local_peer_id, autonat::Config::default());
+                let autonat = autonat::Behaviour::new(local_peer_id, autonat::Config::default());
 
                 let dcutr_behaviour = dcutr::Behaviour::new(local_peer_id);
 
@@ -288,6 +276,17 @@ impl NetworkNode {
                     }
                 }
             },
+
+            SwarmEvent::Behaviour(MarrowBehaviourEvent::ReqResp(
+                libp2p::request_response::Event::OutboundFailure {
+                    request_id, error, ..
+                },
+            )) => {
+                if let Some(sender) = self.pending_responses.remove(&request_id) {
+                    let error: Box<dyn Error + Send + Sync> = Box::new(error);
+                    let _ = sender.send(Err(error));
+                }
+            }
 
             SwarmEvent::Behaviour(MarrowBehaviourEvent::Dcutr(dcutr::Event {
                 remote_peer_id,
