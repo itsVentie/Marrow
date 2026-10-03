@@ -283,22 +283,34 @@ pub async fn send_chat_message(
     let cmd_tx = {
         let guard = state.network_cmd.lock().map_err(map_err_str)?;
 
-        guard.as_ref().cloned()
+        guard
+            .as_ref()
+            .cloned()
+            .ok_or("Network runtime not initialized")?
     };
 
-    if let Some(tx) = cmd_tx {
-        if let Ok(peer_id) = pubkey_hex_to_peer_id(&peer_pubkey_hex) {
-            let (oneshot_tx, oneshot_rx) = tokio::sync::oneshot::channel();
+    let peer_id = pubkey_hex_to_peer_id(&peer_pubkey_hex)?;
 
-            let _ = tx
-                .send(NetworkCommand::SendFrame {
-                    peer_id,
-                    data: wire_bytes,
-                    sender: oneshot_tx,
-                })
-                .await;
+    let (oneshot_tx, oneshot_rx) = tokio::sync::oneshot::channel();
 
-            let _ = oneshot_rx.await;
+    cmd_tx
+        .send(NetworkCommand::SendFrame {
+            peer_id,
+            data: wire_bytes,
+            sender: oneshot_tx,
+        })
+        .await
+        .map_err(|_| "Failed to send message to network runtime".to_string())?;
+
+    match oneshot_rx.await {
+        Ok(Ok(_)) => {}
+
+        Ok(Err(error)) => {
+            return Err(format!("Failed to send message: {error}"));
+        }
+
+        Err(error) => {
+            return Err(format!("Message send response channel closed: {error}"));
         }
     }
 
