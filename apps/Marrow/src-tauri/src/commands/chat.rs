@@ -1,10 +1,12 @@
 use crate::dto::{DecryptedMessageDto, SearchResultDto};
 use crate::network::{map_err_str, parse_peer_pk_array, pubkey_hex_to_peer_id};
 use crate::state::AppState;
+
 use r_crypto::handshake::HandshakeInitiator;
 use r_network::NetworkCommand;
 use r_protocol::{EncryptedMessagePayload, Frame, HandshakeInitPayload};
 use r_storage::{MessageDirection, Session, StoredMessage};
+
 use tauri::State;
 
 #[tauri::command]
@@ -13,6 +15,7 @@ pub fn create_session(
     state: State<'_, AppState>,
 ) -> Result<Session, String> {
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
+
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
     let now = std::time::SystemTime::now()
@@ -28,6 +31,7 @@ pub fn create_session(
 #[tauri::command]
 pub fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, String> {
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
+
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
     storage.list_sessions().map_err(map_err_str)
@@ -36,11 +40,13 @@ pub fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, String>
 #[tauri::command]
 pub fn delete_session(session_id: String, state: State<'_, AppState>) -> Result<bool, String> {
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
+
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
     storage
         .delete_messages_for_session(&session_id)
         .map_err(map_err_str)?;
+
     storage.delete_session(&session_id).map_err(map_err_str)
 }
 
@@ -53,6 +59,7 @@ pub async fn send_chat_message(
 ) -> Result<DecryptedMessageDto, String> {
     let canonical_session_id = peer_pubkey_hex.clone();
     let plaintext = text.as_bytes();
+
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(map_err_str)?
@@ -60,7 +67,9 @@ pub async fn send_chat_message(
 
     let my_pubkey = {
         let identity_guard = state.identity.lock().map_err(map_err_str)?;
+
         let identity = identity_guard.as_ref().ok_or("Identity not unlocked")?;
+
         identity.public_hex()
     };
 
@@ -68,46 +77,135 @@ pub async fn send_chat_message(
 
     let is_session_active = {
         let sessions_guard = state.crypto_sessions.lock().map_err(map_err_str)?;
+
         sessions_guard.contains_key(&canonical_session_id)
     };
 
     if !is_session_active {
         let signing_key = {
             let identity_guard = state.identity.lock().map_err(map_err_str)?;
+
             let identity = identity_guard.as_ref().ok_or("Identity not unlocked")?;
+
             identity.signing_key().clone()
         };
 
         let mut initiator = HandshakeInitiator::new();
 
         let init_output = initiator.generate_init_payload(&signing_key, &peer_pk_array);
+
         let my_pk_array = parse_peer_pk_array(&my_pubkey)?;
+
         let init_payload = HandshakeInitPayload::new(my_pk_array, init_output);
+
         let init_frame = Frame::HandshakeInit(init_payload);
 
         let encoded_init = init_frame.encode_padded().map_err(map_err_str)?;
 
-        {
-            let mut pending_guard = state.pending_handshakes.lock().map_err(map_err_str)?;
-            pending_guard.insert(peer_pubkey_hex.clone(), initiator);
+        let peer_id = pubkey_hex_to_peer_id(&peer_pubkey_hex)?;
+
+        let contact_multiaddr = {
+            let storage_guard = state.storage.lock().map_err(map_err_str)?;
+
+            let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
+
+            storage
+                .get_contact_address(&canonical_session_id)
+                .map_err(map_err_str)?
+        };
+
+        let multiaddr = contact_multiaddr
+            .parse::<libp2p::Multiaddr>()
+            .map_err(map_err_str)?;
+
+        let embedded_peer_id = multiaddr
+            .iter()
+            .filter_map(|protocol| match protocol {
+                libp2p::multiaddr::Protocol::P2p(peer_id) => Some(peer_id),
+                _ => None,
+            })
+            .last()
+            .ok_or("Contact multiaddr does not contain a /p2p/<peer_id> component")?;
+
+        if embedded_peer_id != peer_id {
+            return Err("Contact multiaddr peer ID does not match contact public key".into());
         }
 
         let cmd_tx = {
             let guard = state.network_cmd.lock().map_err(map_err_str)?;
+
             guard.as_ref().cloned()
         };
 
-        if let Some(tx) = cmd_tx {
-            if let Ok(peer_id) = pubkey_hex_to_peer_id(&peer_pubkey_hex) {
-                let (oneshot_tx, oneshot_rx) = tokio::sync::oneshot::channel();
-                let _ = tx
-                    .send(NetworkCommand::SendFrame {
-                        peer_id,
-                        data: encoded_init,
-                        sender: oneshot_tx,
-                    })
-                    .await;
-                let _ = oneshot_rx.await;
+        let Some(tx) = cmd_tx else {
+            return Err("Network runtime not initialized".into());
+        };
+
+        let (dial_tx, dial_rx) = tokio::sync::oneshot::channel();
+
+        tx.send(NetworkCommand::Dial {
+            peer_id,
+            addr: multiaddr,
+            sender: dial_tx,
+        })
+        .await
+        .map_err(|_| "Failed to send dial command to network runtime".to_string())?;
+
+        match dial_rx.await {
+            Ok(Ok(())) => {}
+
+            Ok(Err(error)) => {
+                return Err(format!("Failed to connect to peer: {error}"));
+            }
+
+            Err(error) => {
+                return Err(format!("Dial response channel closed: {error}"));
+            }
+        }
+
+        {
+            let mut pending_guard = state.pending_handshakes.lock().map_err(map_err_str)?;
+
+            pending_guard.insert(peer_pubkey_hex.clone(), initiator);
+        }
+
+        let (oneshot_tx, oneshot_rx) = tokio::sync::oneshot::channel();
+
+        if tx
+            .send(NetworkCommand::SendFrame {
+                peer_id,
+                data: encoded_init,
+                sender: oneshot_tx,
+            })
+            .await
+            .is_err()
+        {
+            let mut pending_guard = state.pending_handshakes.lock().map_err(map_err_str)?;
+
+            pending_guard.remove(&peer_pubkey_hex);
+
+            return Err("Failed to send handshake frame to network runtime".into());
+        }
+
+        match oneshot_rx.await {
+            Ok(Ok(_)) => {}
+
+            Ok(Err(error)) => {
+                let mut pending_guard = state.pending_handshakes.lock().map_err(map_err_str)?;
+
+                pending_guard.remove(&peer_pubkey_hex);
+
+                return Err(format!("Failed to send handshake frame: {error}"));
+            }
+
+            Err(error) => {
+                let mut pending_guard = state.pending_handshakes.lock().map_err(map_err_str)?;
+
+                pending_guard.remove(&peer_pubkey_hex);
+
+                return Err(format!(
+                    "Handshake request response channel closed: {error}"
+                ));
             }
         }
 
@@ -118,11 +216,13 @@ pub async fn send_chat_message(
 
     let (wire_bytes, sequence_number, plaintext_bytes) = {
         let mut sessions_guard = state.crypto_sessions.lock().map_err(map_err_str)?;
+
         let session = sessions_guard
             .get_mut(&canonical_session_id)
             .ok_or("Active session not found")?;
 
         let ad = canonical_session_id.as_bytes();
+
         let encrypted_msg = session
             .ratchet
             .encrypt(plaintext, ad)
@@ -140,6 +240,7 @@ pub async fn send_chat_message(
         };
 
         let frame = Frame::Message(msg_payload);
+
         let encoded_frame = frame.encode_padded().map_err(map_err_str)?;
 
         let seq = session.sequence_number;
@@ -159,8 +260,11 @@ pub async fn send_chat_message(
 
     {
         let storage_guard = state.storage.lock().map_err(map_err_str)?;
+
         let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
+
         storage.store_message(&stored_msg).map_err(map_err_str)?;
+
         storage
             .update_session_activity(&canonical_session_id, now)
             .map_err(map_err_str)?;
@@ -168,20 +272,24 @@ pub async fn send_chat_message(
 
     {
         let search_guard = state.search.lock().map_err(map_err_str)?;
+
         if let Some(ref search_index) = *search_guard {
             let msg_id = format!("{}/{}", canonical_session_id, sequence_number);
+
             let _ = search_index.index_message(&msg_id, &canonical_session_id, now as u64, &text);
         }
     }
 
     let cmd_tx = {
         let guard = state.network_cmd.lock().map_err(map_err_str)?;
+
         guard.as_ref().cloned()
     };
 
     if let Some(tx) = cmd_tx {
         if let Ok(peer_id) = pubkey_hex_to_peer_id(&peer_pubkey_hex) {
             let (oneshot_tx, oneshot_rx) = tokio::sync::oneshot::channel();
+
             let _ = tx
                 .send(NetworkCommand::SendFrame {
                     peer_id,
@@ -189,6 +297,7 @@ pub async fn send_chat_message(
                     sender: oneshot_tx,
                 })
                 .await;
+
             let _ = oneshot_rx.await;
         }
     }
@@ -209,6 +318,7 @@ pub fn get_session_messages(
     state: State<'_, AppState>,
 ) -> Result<Vec<DecryptedMessageDto>, String> {
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
+
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
     let messages = storage
@@ -237,11 +347,13 @@ pub fn search_messages(
     state: State<'_, AppState>,
 ) -> Result<Vec<SearchResultDto>, String> {
     let search_guard = state.search.lock().map_err(map_err_str)?;
+
     let search_index = search_guard
         .as_ref()
         .ok_or("Search index not initialized")?;
 
     let max_results = limit.unwrap_or(20);
+
     let raw_results = search_index
         .search(&query, max_results)
         .map_err(map_err_str)?;
