@@ -1,10 +1,7 @@
 use crate::dto::{KeyFileInfoDto, PublicIdentityDto};
 use crate::network::event_loop::{
-    handle_connection_closed,
-    handle_connection_established,
-    handle_hole_punch_success,
-    handle_network_frame,
-    handle_network_listening,
+    handle_connection_closed, handle_connection_established, handle_hole_punch_success,
+    handle_network_frame, handle_network_listening,
 };
 use crate::network::{derive_network_keypair, map_err_str};
 use crate::state::AppState;
@@ -41,8 +38,7 @@ fn ensure_search_index(
     let mut search_guard = state.search.lock().map_err(map_err_str)?;
 
     if search_guard.is_none() {
-        let search =
-            SearchIndex::open_or_create(search_path, search_key).map_err(map_err_str)?;
+        let search = SearchIndex::open_or_create(search_path, search_key).map_err(map_err_str)?;
 
         *search_guard = Some(search);
     }
@@ -65,8 +61,7 @@ fn initialize_network(
 
     let keypair = derive_network_keypair(identity)?;
 
-    let (node, cmd_tx, mut event_rx) =
-        NetworkNode::new(keypair).map_err(map_err_str)?;
+    let (node, cmd_tx, mut event_rx) = NetworkNode::new(keypair).map_err(map_err_str)?;
 
     tauri::async_runtime::spawn(node.run());
 
@@ -76,40 +71,23 @@ fn initialize_network(
         while let Some(event) = event_rx.recv().await {
             match event {
                 NetworkEvent::FrameReceived { peer_id, data } => {
-                    handle_network_frame(
-                        handle_clone.clone(),
-                        peer_id.to_string(),
-                        data,
-                    )
-                    .await;
+                    handle_network_frame(handle_clone.clone(), peer_id.to_string(), data).await;
                 }
 
                 NetworkEvent::HolePunchSuccessful { peer_id } => {
-                    handle_hole_punch_success(
-                        handle_clone.clone(),
-                        peer_id.to_string(),
-                    );
+                    handle_hole_punch_success(handle_clone.clone(), peer_id.to_string());
                 }
 
                 NetworkEvent::Listening { address } => {
-                    handle_network_listening(
-                        handle_clone.clone(),
-                        address.to_string(),
-                    );
+                    handle_network_listening(handle_clone.clone(), address.to_string());
                 }
 
                 NetworkEvent::ConnectionEstablished { peer_id } => {
-                    handle_connection_established(
-                        handle_clone.clone(),
-                        peer_id.to_string(),
-                    );
+                    handle_connection_established(handle_clone.clone(), peer_id.to_string());
                 }
 
                 NetworkEvent::ConnectionClosed { peer_id } => {
-                    handle_connection_closed(
-                        handle_clone.clone(),
-                        peer_id.to_string(),
-                    );
+                    handle_connection_closed(handle_clone.clone(), peer_id.to_string());
                 }
             }
         }
@@ -122,9 +100,7 @@ fn initialize_network(
 }
 
 #[tauri::command]
-pub fn list_identity_files(
-    app_handle: tauri::AppHandle,
-) -> Result<Vec<KeyFileInfoDto>, String> {
+pub fn list_identity_files(app_handle: tauri::AppHandle) -> Result<Vec<KeyFileInfoDto>, String> {
     let app_dir = app_handle.path().app_data_dir().map_err(map_err_str)?;
 
     if !app_dir.exists() {
@@ -170,9 +146,7 @@ pub fn create_identity(
 ) -> Result<PublicIdentityDto, String> {
     let mut storage_guard = state.storage.lock().map_err(map_err_str)?;
 
-    let storage = storage_guard
-        .as_mut()
-        .ok_or("Storage not initialized")?;
+    let storage = storage_guard.as_mut().ok_or("Storage not initialized")?;
 
     let identity = Identity::generate();
 
@@ -190,10 +164,7 @@ pub fn create_identity(
 
     let short_pubkey = &pubkey_hex[..8];
 
-    let clean_alias = alias
-        .as_deref()
-        .map(sanitize_filename)
-        .unwrap_or_default();
+    let clean_alias = alias.as_deref().map(sanitize_filename).unwrap_or_default();
 
     let filename = if !clean_alias.is_empty() {
         format!("{}.key", clean_alias)
@@ -220,9 +191,7 @@ pub fn create_identity(
     {
         let identity_guard = state.identity.lock().map_err(map_err_str)?;
 
-        let identity = identity_guard
-            .as_ref()
-            .ok_or("Identity not initialized")?;
+        let identity = identity_guard.as_ref().ok_or("Identity not initialized")?;
 
         initialize_network(&app_handle, &state, identity)?;
     }
@@ -239,11 +208,9 @@ pub fn unlock_identity_from_file(
 ) -> Result<PublicIdentityDto, String> {
     let bytes = fs::read(&file_path).map_err(map_err_str)?;
 
-    let vault: r_crypto::EncryptedVault =
-        bincode::deserialize(&bytes).map_err(map_err_str)?;
+    let vault: r_crypto::EncryptedVault = bincode::deserialize(&bytes).map_err(map_err_str)?;
 
-    let identity =
-        Identity::import_encrypted(&vault, password.as_bytes()).map_err(map_err_str)?;
+    let identity = Identity::import_encrypted(&vault, password.as_bytes()).map_err(map_err_str)?;
 
     let pubkey_hex = identity.public_hex();
 
@@ -321,20 +288,22 @@ pub fn get_current_identity(
 pub fn logout_identity(state: State<'_, AppState>) -> Result<(), String> {
     {
         let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
-
         cmd_guard.take();
     }
 
     {
         let mut pending_guard = state.pending_handshakes.lock().map_err(map_err_str)?;
-
         pending_guard.clear();
     }
 
     {
         let mut sessions_guard = state.crypto_sessions.lock().map_err(map_err_str)?;
-
         sessions_guard.clear();
+    }
+
+    {
+        let mut peer_mapping_guard = state.peer_id_to_pubkey.lock().map_err(map_err_str)?;
+        peer_mapping_guard.clear();
     }
 
     {
@@ -347,13 +316,11 @@ pub fn logout_identity(state: State<'_, AppState>) -> Result<(), String> {
 
     {
         let mut search_guard = state.search.lock().map_err(map_err_str)?;
-
         search_guard.take();
     }
 
     {
         let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
-
         identity_guard.take();
     }
 
