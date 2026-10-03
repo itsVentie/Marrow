@@ -1,15 +1,10 @@
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
-
 use r_crypto::EncryptedVault;
-
 use rand::rngs::OsRng;
 use rand::RngCore;
-
 use redb::{Database, ReadableTable, TableDefinition};
-
 use std::path::Path;
-
 use zeroize::Zeroize;
 
 use crate::error::StorageError;
@@ -18,6 +13,9 @@ use crate::models::{Contact, Session, StoredMessage};
 const VAULT_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("system_vault");
 
 const CONTACTS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("contacts");
+
+const CONTACT_ADDRESSES_TABLE: TableDefinition<&str, &[u8]> =
+    TableDefinition::new("contact_addresses");
 
 const SESSIONS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("sessions");
 
@@ -37,6 +35,7 @@ impl StorageEngine {
         {
             let _ = write_txn.open_table(VAULT_TABLE)?;
             let _ = write_txn.open_table(CONTACTS_TABLE)?;
+            let _ = write_txn.open_table(CONTACT_ADDRESSES_TABLE)?;
             let _ = write_txn.open_table(SESSIONS_TABLE)?;
             let _ = write_txn.open_table(MESSAGES_TABLE)?;
         }
@@ -72,7 +71,6 @@ impl StorageEngine {
             .map_err(|_| StorageError::EncryptionError)?;
 
         let mut out = Vec::with_capacity(24 + ciphertext.len());
-
         out.extend_from_slice(&nonce_bytes);
         out.extend_from_slice(&ciphertext);
 
@@ -89,7 +87,6 @@ impl StorageEngine {
         let cipher = XChaCha20Poly1305::new(key.into());
 
         let nonce = XNonce::from_slice(&data[..24]);
-
         let ciphertext = &data[24..];
 
         cipher
@@ -104,7 +101,6 @@ impl StorageEngine {
 
         {
             let mut table = write_txn.open_table(VAULT_TABLE)?;
-
             table.insert("identity", bytes.as_slice())?;
         }
 
@@ -115,7 +111,6 @@ impl StorageEngine {
 
     pub fn load_vault(&self) -> Result<EncryptedVault, StorageError> {
         let read_txn = self.db.begin_read()?;
-
         let table = read_txn.open_table(VAULT_TABLE)?;
 
         let value = table.get("identity")?.ok_or(StorageError::NotFound)?;
@@ -127,17 +122,41 @@ impl StorageEngine {
     }
 
     pub fn save_contact(&self, contact: &Contact) -> Result<(), StorageError> {
-        let raw_bytes =
+        self.save_contact_with_address(contact, None)
+    }
+
+    pub fn save_contact_with_address(
+        &self,
+        contact: &Contact,
+        multiaddr: Option<&str>,
+    ) -> Result<(), StorageError> {
+        let raw_contact =
             bincode::serialize(contact).map_err(|_| StorageError::SerializationError)?;
 
-        let encrypted_bytes = self.encrypt_bytes(&raw_bytes)?;
+        let encrypted_contact = self.encrypt_bytes(&raw_contact)?;
+
+        let encrypted_address = match multiaddr {
+            Some(address) => {
+                let raw_address = bincode::serialize(&address.to_string())
+                    .map_err(|_| StorageError::SerializationError)?;
+
+                Some(self.encrypt_bytes(&raw_address)?)
+            }
+            None => None,
+        };
 
         let write_txn = self.db.begin_write()?;
 
         {
-            let mut table = write_txn.open_table(CONTACTS_TABLE)?;
+            let mut contacts_table = write_txn.open_table(CONTACTS_TABLE)?;
 
-            table.insert(contact.pubkey_hex.as_str(), encrypted_bytes.as_slice())?;
+            contacts_table.insert(contact.pubkey_hex.as_str(), encrypted_contact.as_slice())?;
+        }
+
+        if let Some(encrypted_address) = encrypted_address {
+            let mut addresses_table = write_txn.open_table(CONTACT_ADDRESSES_TABLE)?;
+
+            addresses_table.insert(contact.pubkey_hex.as_str(), encrypted_address.as_slice())?;
         }
 
         write_txn.commit()?;
@@ -147,7 +166,6 @@ impl StorageEngine {
 
     pub fn get_contact(&self, pubkey_hex: &str) -> Result<Contact, StorageError> {
         let read_txn = self.db.begin_read()?;
-
         let table = read_txn.open_table(CONTACTS_TABLE)?;
 
         let value = table.get(pubkey_hex)?.ok_or(StorageError::NotFound)?;
@@ -162,7 +180,6 @@ impl StorageEngine {
 
     pub fn list_contacts(&self) -> Result<Vec<Contact>, StorageError> {
         let read_txn = self.db.begin_read()?;
-
         let table = read_txn.open_table(CONTACTS_TABLE)?;
 
         let mut contacts = Vec::new();
@@ -181,16 +198,71 @@ impl StorageEngine {
         Ok(contacts)
     }
 
+    pub fn get_contact_address(&self, pubkey_hex: &str) -> Result<String, StorageError> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(CONTACT_ADDRESSES_TABLE)?;
+
+        let value = table.get(pubkey_hex)?.ok_or(StorageError::NotFound)?;
+
+        let decrypted_bytes = self.decrypt_bytes(value.value())?;
+
+        let multiaddr: String =
+            bincode::deserialize(&decrypted_bytes).map_err(|_| StorageError::SerializationError)?;
+
+        Ok(multiaddr)
+    }
+
+    pub fn save_contact_address(
+        &self,
+        pubkey_hex: &str,
+        multiaddr: &str,
+    ) -> Result<(), StorageError> {
+        let raw_bytes = bincode::serialize(&multiaddr.to_string())
+            .map_err(|_| StorageError::SerializationError)?;
+
+        let encrypted_bytes = self.encrypt_bytes(&raw_bytes)?;
+
+        let write_txn = self.db.begin_write()?;
+
+        {
+            let mut table = write_txn.open_table(CONTACT_ADDRESSES_TABLE)?;
+
+            table.insert(pubkey_hex, encrypted_bytes.as_slice())?;
+        }
+
+        write_txn.commit()?;
+
+        Ok(())
+    }
+
+    pub fn delete_contact_address(&self, pubkey_hex: &str) -> Result<bool, StorageError> {
+        let write_txn = self.db.begin_write()?;
+
+        let removed = {
+            let mut table = write_txn.open_table(CONTACT_ADDRESSES_TABLE)?;
+            let result = table.remove(pubkey_hex)?;
+            result.is_some()
+        };
+
+        write_txn.commit()?;
+
+        Ok(removed)
+    }
+
     pub fn delete_contact(&self, pubkey_hex: &str) -> Result<bool, StorageError> {
         let write_txn = self.db.begin_write()?;
 
         let removed = {
-            let mut table = write_txn.open_table(CONTACTS_TABLE)?;
-
-            let opt = table.remove(pubkey_hex)?;
-
-            opt.is_some()
+            let mut contacts_table = write_txn.open_table(CONTACTS_TABLE)?;
+            let result = contacts_table.remove(pubkey_hex)?;
+            result.is_some()
         };
+
+        {
+            let mut addresses_table = write_txn.open_table(CONTACT_ADDRESSES_TABLE)?;
+
+            let _ = addresses_table.remove(pubkey_hex)?;
+        }
 
         write_txn.commit()?;
 
@@ -225,7 +297,6 @@ impl StorageEngine {
 
     pub fn get_session(&self, session_id: &str) -> Result<Session, StorageError> {
         let read_txn = self.db.begin_read()?;
-
         let table = read_txn.open_table(SESSIONS_TABLE)?;
 
         let value = table.get(session_id)?.ok_or(StorageError::NotFound)?;
@@ -237,7 +308,6 @@ impl StorageEngine {
 
     pub fn list_sessions(&self) -> Result<Vec<Session>, StorageError> {
         let read_txn = self.db.begin_read()?;
-
         let table = read_txn.open_table(SESSIONS_TABLE)?;
 
         let mut sessions = Vec::new();
@@ -288,10 +358,8 @@ impl StorageEngine {
 
         let removed = {
             let mut table = write_txn.open_table(SESSIONS_TABLE)?;
-
-            let opt = table.remove(session_id)?;
-
-            opt.is_some()
+            let result = table.remove(session_id)?;
+            result.is_some()
         };
 
         write_txn.commit()?;
@@ -324,7 +392,6 @@ impl StorageEngine {
         session_id: &str,
     ) -> Result<Vec<StoredMessage>, StorageError> {
         let read_txn = self.db.begin_read()?;
-
         let table = read_txn.open_table(MESSAGES_TABLE)?;
 
         let prefix = format!("{session_id}/");
@@ -352,7 +419,6 @@ impl StorageEngine {
 
         let keys: Vec<String> = {
             let read_txn = self.db.begin_read()?;
-
             let table = read_txn.open_table(MESSAGES_TABLE)?;
 
             table
