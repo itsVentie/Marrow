@@ -267,7 +267,7 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_id: String, dat
                 return;
             };
 
-            let ad = peer_id.as_bytes();
+            let ad = session_pubkey_hex.as_bytes();
 
             let encrypted_msg = match bincode::deserialize::<r_crypto::ratchet::EncryptedMessage>(
                 &payload.ciphertext,
