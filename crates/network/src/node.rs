@@ -6,7 +6,7 @@ use libp2p::{
     kad::{store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
     ping,
     request_response::{Behaviour as RequestResponse, Config as ReqRespConfig, ProtocolSupport},
-    swarm::SwarmEvent,
+    swarm::{ConnectionId, SwarmEvent},
     Multiaddr, PeerId, StreamProtocol, Swarm,
 };
 
@@ -49,8 +49,18 @@ pub enum NetworkEvent {
 }
 
 type PendingResponseResult = Result<Vec<u8>, Box<dyn Error + Send + Sync>>;
+
 type PendingResponseSender = oneshot::Sender<PendingResponseResult>;
+
 type PendingResponses = HashMap<libp2p::request_response::OutboundRequestId, PendingResponseSender>;
+
+type PendingDialResult = Result<(), Box<dyn Error + Send + Sync>>;
+
+type PendingDialSender = oneshot::Sender<PendingDialResult>;
+
+type PendingDialsByPeer = HashMap<PeerId, Vec<PendingDialSender>>;
+
+type PendingDialsByConnection = HashMap<ConnectionId, PendingDialSender>;
 
 type NetworkInitResult = Result<
     (
@@ -66,6 +76,8 @@ pub struct NetworkNode {
     command_receiver: mpsc::Receiver<NetworkCommand>,
     event_sender: mpsc::Sender<NetworkEvent>,
     pending_responses: PendingResponses,
+    pending_dials_by_peer: PendingDialsByPeer,
+    pending_dials_by_connection: PendingDialsByConnection,
 }
 
 impl NetworkNode {
@@ -128,6 +140,8 @@ impl NetworkNode {
             command_receiver: cmd_rx,
             event_sender: event_tx,
             pending_responses: HashMap::new(),
+            pending_dials_by_peer: HashMap::new(),
+            pending_dials_by_connection: HashMap::new(),
         };
 
         Ok((node, cmd_tx, event_rx))
@@ -139,12 +153,14 @@ impl NetworkNode {
         loop {
             tokio::select! {
                 event = self.swarm.select_next_some() => {
-                    self.handle_swarm_event(event).await
+                    self.handle_swarm_event(event).await;
                 }
 
                 command = self.command_receiver.recv() => {
                     match command {
-                        Some(cmd) => self.handle_command(cmd).await,
+                        Some(cmd) => {
+                            self.handle_command(cmd).await;
+                        }
                         None => break,
                     }
                 }
@@ -169,17 +185,34 @@ impl NetworkNode {
                 addr,
                 sender,
             } => {
+                if self.swarm.is_connected(&peer_id) {
+                    let _ = sender.send(Ok(()));
+                    return;
+                }
+
                 self.swarm
                     .behaviour_mut()
                     .kademlia
                     .add_address(&peer_id, addr.clone());
 
-                let res = self
-                    .swarm
-                    .dial(addr)
-                    .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>);
+                self.pending_dials_by_peer
+                    .entry(peer_id)
+                    .or_default()
+                    .push(sender);
 
-                let _ = sender.send(res);
+                if let Err(error) = self.swarm.dial(addr) {
+                    if let Some(waiters) = self.pending_dials_by_peer.get_mut(&peer_id) {
+                        if let Some(sender) = waiters.pop() {
+                            let error: Box<dyn Error + Send + Sync> = Box::new(error);
+
+                            let _ = sender.send(Err(error));
+                        }
+
+                        if waiters.is_empty() {
+                            self.pending_dials_by_peer.remove(&peer_id);
+                        }
+                    }
+                }
             }
 
             NetworkCommand::SendFrame {
@@ -230,11 +263,62 @@ impl NetworkNode {
                     .await;
             }
 
-            SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+            SwarmEvent::Dialing {
+                peer_id: Some(peer_id),
+                connection_id,
+            } => {
+                if let Some(waiters) = self.pending_dials_by_peer.get_mut(&peer_id) {
+                    if let Some(sender) = waiters.pop() {
+                        self.pending_dials_by_connection
+                            .insert(connection_id, sender);
+                    }
+
+                    if waiters.is_empty() {
+                        self.pending_dials_by_peer.remove(&peer_id);
+                    }
+                }
+            }
+
+            SwarmEvent::ConnectionEstablished {
+                peer_id,
+                connection_id,
+                ..
+            } => {
+                if let Some(sender) = self.pending_dials_by_connection.remove(&connection_id) {
+                    let _ = sender.send(Ok(()));
+                }
+
                 let _ = self
                     .event_sender
                     .send(NetworkEvent::ConnectionEstablished { peer_id })
                     .await;
+            }
+
+            SwarmEvent::OutgoingConnectionError {
+                connection_id,
+                peer_id,
+                error,
+            } => {
+                if let Some(sender) = self.pending_dials_by_connection.remove(&connection_id) {
+                    let error: Box<dyn Error + Send + Sync> = Box::new(error);
+
+                    let _ = sender.send(Err(error));
+                } else if let Some(peer_id) = peer_id {
+                    if let Some(waiters) = self.pending_dials_by_peer.remove(&peer_id) {
+                        let error: Box<dyn Error + Send + Sync> = Box::new(std::io::Error::new(
+                            std::io::ErrorKind::ConnectionAborted,
+                            "Outbound connection failed",
+                        ));
+
+                        for sender in waiters {
+                            let _ = sender.send(Err(std::io::Error::new(
+                                std::io::ErrorKind::ConnectionAborted,
+                                error.to_string(),
+                            )
+                            .into()));
+                        }
+                    }
+                }
             }
 
             SwarmEvent::ConnectionClosed { peer_id, .. } => {
@@ -284,6 +368,7 @@ impl NetworkNode {
             )) => {
                 if let Some(sender) = self.pending_responses.remove(&request_id) {
                     let error: Box<dyn Error + Send + Sync> = Box::new(error);
+
                     let _ = sender.send(Err(error));
                 }
             }
