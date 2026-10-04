@@ -9,7 +9,6 @@ async fn test_frame_encoding_and_decoding() {
         dh_pubkey: [3u8; 32],
         sequence_number: 1,
         previous_chain_length: 0,
-        nonce: [0u8; 12],
         ciphertext: vec![1, 2, 3, 4],
     };
 
@@ -27,7 +26,6 @@ async fn test_padded_frame_encoding_and_decoding() {
         dh_pubkey: [3u8; 32],
         sequence_number: 42,
         previous_chain_length: 1,
-        nonce: [9u8; 12],
         ciphertext: vec![0xDE, 0xAD, 0xBE, 0xEF],
     };
 

@@ -122,7 +122,6 @@ fn test_padded_message_frame_roundtrip() {
         dh_pubkey: [0x42; 32],
         sequence_number: 1,
         previous_chain_length: 0,
-        nonce: [0x07; 12],
         ciphertext: vec![1, 2, 3, 4, 5],
     };
 

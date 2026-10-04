@@ -69,7 +69,6 @@ pub struct EncryptedMessagePayload {
     pub dh_pubkey: [u8; 32],
     pub sequence_number: u64,
     pub previous_chain_length: u32,
-    pub nonce: [u8; 12],
     pub ciphertext: Vec<u8>,
 }
 
@@ -169,7 +168,6 @@ mod tests {
             dh_pubkey: [0x22; 32],
             sequence_number: 10,
             previous_chain_length: 2,
-            nonce: [0x33; 12],
             ciphertext: vec![0xde, 0xad, 0xbe, 0xef],
         };
 
@@ -188,7 +186,6 @@ mod tests {
             dh_pubkey: [0x00; 32],
             sequence_number: 0,
             previous_chain_length: 0,
-            nonce: [0x00; 12],
             ciphertext: vec![0u8; MAX_FRAME_SIZE],
         };
 
@@ -324,7 +321,6 @@ mod tests {
             dh_pubkey: [0x00; 32],
             sequence_number: 0,
             previous_chain_length: 0,
-            nonce: [0x00; 12],
             ciphertext: vec![0u8; payload_size],
         };
 
