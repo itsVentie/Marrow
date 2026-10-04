@@ -14,6 +14,12 @@ pub fn create_session(
     peer_pubkey_hex: String,
     state: State<'_, AppState>,
 ) -> Result<Session, String> {
+    {
+        let identity_guard = state.identity.lock().map_err(map_err_str)?;
+
+        identity_guard.as_ref().ok_or("Identity not unlocked")?;
+    }
+
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
 
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
