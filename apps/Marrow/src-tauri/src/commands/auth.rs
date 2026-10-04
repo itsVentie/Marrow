@@ -67,7 +67,7 @@ fn initialize_network(
 
     let (node, cmd_tx, mut event_rx) = NetworkNode::new(keypair).map_err(map_err_str)?;
 
-    tauri::async_runtime::spawn(node.run());
+    let network_task = tauri::async_runtime::spawn(node.run());
 
     let handle_clone = app_handle.clone();
 
@@ -100,6 +100,11 @@ fn initialize_network(
     {
         let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
         *cmd_guard = Some(cmd_tx.clone());
+    }
+
+    {
+        let mut task_guard = state.network_task.lock().map_err(map_err_str)?;
+        *task_guard = Some(network_task);
     }
 
     tauri::async_runtime::spawn(async move {
@@ -329,6 +334,14 @@ pub fn logout_identity(state: State<'_, AppState>) -> Result<(), String> {
     {
         let mut cmd_guard = state.network_cmd.lock().map_err(map_err_str)?;
         cmd_guard.take();
+    }
+
+    {
+        let mut task_guard = state.network_task.lock().map_err(map_err_str)?;
+
+        if let Some(task) = task_guard.take() {
+            task.abort();
+        }
     }
 
     {
