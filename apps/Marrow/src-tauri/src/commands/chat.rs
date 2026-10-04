@@ -36,8 +36,13 @@ pub fn create_session(
 
 #[tauri::command]
 pub fn list_sessions(state: State<'_, AppState>) -> Result<Vec<Session>, String> {
-    let storage_guard = state.storage.lock().map_err(map_err_str)?;
+    {
+        let identity_guard = state.identity.lock().map_err(map_err_str)?;
 
+        identity_guard.as_ref().ok_or("Identity not unlocked")?;
+    }
+
+    let storage_guard = state.storage.lock().map_err(map_err_str)?;
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
 
     storage.list_sessions().map_err(map_err_str)
