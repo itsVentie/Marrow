@@ -1,5 +1,5 @@
 use bytes::BytesMut;
-use r_protocol::{EncryptedMessagePayload, Frame, HandshakeResponsePayload};
+use r_protocol::{Frame, HandshakeResponsePayload};
 use std::time::Instant;
 
 use crate::config::MAX_OFFLINE_QUEUE_LEN;
@@ -11,9 +11,7 @@ pub fn extract_recipient(frame: &Frame) -> Option<PeerId> {
         Frame::HandshakeResponse(HandshakeResponsePayload {
             recipient_pubkey, ..
         }) => Some(*recipient_pubkey),
-        Frame::Message(EncryptedMessagePayload {
-            recipient_pubkey, ..
-        }) => Some(*recipient_pubkey),
+        Frame::Message(payload) => Some(payload.recipient_pubkey),
         _ => None,
     }
 }
