@@ -380,6 +380,12 @@ pub fn search_messages(
     limit: Option<usize>,
     state: State<'_, AppState>,
 ) -> Result<Vec<SearchResultDto>, String> {
+    {
+        let identity_guard = state.identity.lock().map_err(map_err_str)?;
+
+        identity_guard.as_ref().ok_or("Identity not unlocked")?;
+    }
+
     let search_guard = state.search.lock().map_err(map_err_str)?;
 
     let search_index = search_guard
