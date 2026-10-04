@@ -315,4 +315,22 @@ mod tests {
             _ => panic!("Expected HandshakeInit frame"),
         }
     }
+    #[test]
+    fn test_padded_encoding_respects_max_frame_size() {
+        let payload_size = MAX_FRAME_SIZE - PADDING_BLOCK_SIZE + 1;
+
+        let payload = EncryptedMessagePayload {
+            recipient_pubkey: [0x00; 32],
+            dh_pubkey: [0x00; 32],
+            sequence_number: 0,
+            previous_chain_length: 0,
+            nonce: [0x00; 12],
+            ciphertext: vec![0u8; payload_size],
+        };
+
+        let frame = Frame::Message(payload);
+        let result = frame.encode_padded();
+
+        assert!(matches!(result, Err(ProtocolError::FrameTooLarge(_))));
+    }
 }
