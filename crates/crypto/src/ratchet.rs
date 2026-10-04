@@ -202,7 +202,7 @@ impl DoubleRatchet {
             return Ok(());
         }
 
-        if self.nr + (MAX_SKIPPED_KEYS as u32) < until_n {
+        if until_n.saturating_sub(self.nr) > MAX_SKIPPED_KEYS as u32 {
             return Err(RatchetError::TooManySkippedKeys);
         }
 
