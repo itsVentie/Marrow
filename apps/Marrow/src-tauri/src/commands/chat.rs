@@ -329,6 +329,12 @@ pub fn get_session_messages(
     session_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<DecryptedMessageDto>, String> {
+    {
+        let identity_guard = state.identity.lock().map_err(map_err_str)?;
+
+        identity_guard.as_ref().ok_or("Identity not unlocked")?;
+    }
+
     let storage_guard = state.storage.lock().map_err(map_err_str)?;
 
     let storage = storage_guard.as_ref().ok_or("Storage not initialized")?;
