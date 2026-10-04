@@ -290,13 +290,6 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_id: String, dat
                 Err(_) => return,
             };
 
-            if payload.dh_pubkey != encrypted_msg.header.dh_pub
-                || payload.sequence_number != encrypted_msg.header.n as u64
-                || payload.previous_chain_length != encrypted_msg.header.pn
-            {
-                return;
-            }
-
             let plaintext_bytes = match session.ratchet.decrypt(&encrypted_msg, ad) {
                 Ok(plaintext) => plaintext,
                 Err(_) => return,

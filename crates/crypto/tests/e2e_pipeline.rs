@@ -118,11 +118,8 @@ fn test_e2e_handshake_frame_and_ratchet_pipeline() {
 #[test]
 fn test_padded_message_frame_roundtrip() {
     let msg_payload = EncryptedMessagePayload {
-        recipient_pubkey: [0xAA; 32],
-        dh_pubkey: [0x42; 32],
-        sequence_number: 1,
-        previous_chain_length: 0,
-        ciphertext: vec![1, 2, 3, 4, 5],
+        recipient_pubkey: [0x42; 32],
+        ciphertext: vec![0xAB; 64],
     };
 
     let msg_frame = Frame::Message(msg_payload);

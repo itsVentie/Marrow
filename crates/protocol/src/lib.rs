@@ -66,9 +66,6 @@ impl HandshakeResponsePayload {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct EncryptedMessagePayload {
     pub recipient_pubkey: [u8; 32],
-    pub dh_pubkey: [u8; 32],
-    pub sequence_number: u64,
-    pub previous_chain_length: u32,
     pub ciphertext: Vec<u8>,
 }
 
@@ -165,9 +162,6 @@ mod tests {
     fn test_encrypted_message_frame() {
         let payload = EncryptedMessagePayload {
             recipient_pubkey: [0x11; 32],
-            dh_pubkey: [0x22; 32],
-            sequence_number: 10,
-            previous_chain_length: 2,
             ciphertext: vec![0xde, 0xad, 0xbe, 0xef],
         };
 
@@ -183,9 +177,6 @@ mod tests {
     fn test_frame_size_overflow() {
         let oversized_payload = EncryptedMessagePayload {
             recipient_pubkey: [0x00; 32],
-            dh_pubkey: [0x00; 32],
-            sequence_number: 0,
-            previous_chain_length: 0,
             ciphertext: vec![0u8; MAX_FRAME_SIZE],
         };
 
@@ -318,9 +309,6 @@ mod tests {
 
         let payload = EncryptedMessagePayload {
             recipient_pubkey: [0x00; 32],
-            dh_pubkey: [0x00; 32],
-            sequence_number: 0,
-            previous_chain_length: 0,
             ciphertext: vec![0u8; payload_size],
         };
 

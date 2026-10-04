@@ -248,9 +248,6 @@ pub async fn send_chat_message(
 
         let msg_payload = EncryptedMessagePayload {
             recipient_pubkey: peer_pk_array,
-            dh_pubkey: encrypted_msg.header.dh_pub,
-            sequence_number: encrypted_msg.header.n as u64,
-            previous_chain_length: encrypted_msg.header.pn,
             ciphertext: serialized_msg,
         };
 
