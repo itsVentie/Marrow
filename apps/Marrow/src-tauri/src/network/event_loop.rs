@@ -85,6 +85,43 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_id: String, dat
                 Err(_) => return,
             };
 
+            let cmd_tx = {
+                let guard = match state.network_cmd.lock() {
+                    Ok(guard) => guard,
+                    Err(_) => return,
+                };
+
+                guard.as_ref().cloned()
+            };
+
+            let Some(tx) = cmd_tx else {
+                return;
+            };
+
+            let (oneshot_tx, oneshot_rx) = tokio::sync::oneshot::channel();
+
+            if tx
+                .send(NetworkCommand::SendFrame {
+                    peer_id: transport_peer_id,
+                    data: encoded_response,
+                    sender: oneshot_tx,
+                })
+                .await
+                .is_err()
+            {
+                return;
+            }
+
+            // Wait for the request/response layer to confirm that the
+            // handshake response was successfully delivered.
+            //
+            // The response payload itself is not currently used here;
+            // receiving Ok(_) is sufficient to establish the local session.
+            match oneshot_rx.await {
+                Ok(Ok(_)) => {}
+                Ok(Err(_)) | Err(_) => return,
+            }
+
             {
                 let mut sessions_guard = match state.crypto_sessions.lock() {
                     Ok(guard) => guard,
@@ -128,29 +165,6 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_id: String, dat
                     let _ = storage.create_session(&sender_pubkey_hex, now);
                 }
             }
-
-            let cmd_tx = {
-                let guard = match state.network_cmd.lock() {
-                    Ok(guard) => guard,
-                    Err(_) => return,
-                };
-
-                guard.as_ref().cloned()
-            };
-
-            let Some(tx) = cmd_tx else {
-                return;
-            };
-
-            let (oneshot_tx, _) = tokio::sync::oneshot::channel();
-
-            let _ = tx
-                .send(NetworkCommand::SendFrame {
-                    peer_id: transport_peer_id,
-                    data: encoded_response,
-                    sender: oneshot_tx,
-                })
-                .await;
         }
 
         Frame::HandshakeResponse(payload) => {
