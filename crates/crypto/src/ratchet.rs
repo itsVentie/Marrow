@@ -107,12 +107,12 @@ impl DoubleRatchet {
     }
 
     #[deprecated(note = "Use init_initiator instead")]
-    pub fn new_ventie(shared_key: [u8; 32], anek_dh_pub: PublicKey) -> Self {
+    pub fn new_initiator(shared_key: [u8; 32], anek_dh_pub: PublicKey) -> Self {
         Self::init_initiator(shared_key, anek_dh_pub)
     }
 
     #[deprecated(note = "Use init_responder instead")]
-    pub fn new_anek(shared_key: [u8; 32], anek_dh: StaticSecret) -> Self {
+    pub fn new_responder(shared_key: [u8; 32], anek_dh: StaticSecret) -> Self {
         Self::init_responder(shared_key, anek_dh)
     }
 
