@@ -72,6 +72,15 @@ pub struct DoubleRatchet {
     mkskipped: HashMap<SkippedKeyKey, SymmetricKey>,
 }
 
+impl Drop for DoubleRatchet {
+    fn drop(&mut self) {
+        self.rk.zeroize();
+        self.cks.zeroize();
+        self.ckr.zeroize();
+        self.mkskipped.clear();
+    }
+}
+
 impl DoubleRatchet {
     pub fn init_initiator(shared_key: [u8; 32], remote_dh_pub: PublicKey) -> Self {
         let dhs = StaticSecret::random_from_rng(OsRng);
