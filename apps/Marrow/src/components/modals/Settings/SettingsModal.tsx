@@ -1,7 +1,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 
-import { PublicIdentityDto } from "../../../api/tauri";
+import { PublicIdentityDto } from "@/api/tauri";
 
 import {
   AboutSection,
@@ -10,7 +10,7 @@ import {
   StubSectionData,
 } from "./Settingssections";
 
-import styles from "../../../styles/Settings/SettingsModal.module.css";
+import styles from "@/styles/Settings/SettingsModal.module.css";
 
 interface Props {
   identity: PublicIdentityDto;

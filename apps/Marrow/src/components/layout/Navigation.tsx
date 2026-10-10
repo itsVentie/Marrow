@@ -1,5 +1,5 @@
-import { currentScreen } from '../../store/state';
-import type { Screen } from '../../types';
+import { currentScreen } from '@/store/state';
+import type { Screen } from '@/types';
 
 export function Navigation() {
   const setScreen = (s: Screen) => () => (currentScreen.value = s);

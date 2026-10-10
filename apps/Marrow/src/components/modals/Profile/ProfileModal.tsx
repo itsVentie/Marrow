@@ -1,10 +1,10 @@
 import { useEffect } from "preact/hooks";
 
-import { PublicIdentityDto } from "../../../api/tauri";
+import { PublicIdentityDto } from "@/api/tauri";
 
 import { AccountSection } from "../Settings/Settingssections";
 
-import styles from "../../../styles/Profile/ProfileModal.module.css";
+import styles from "@/styles/Profile/ProfileModal.module.css";
 
 interface Props {
   identity: PublicIdentityDto;

@@ -1,5 +1,5 @@
 import { signal, computed } from '@preact/signals';
-import type { Screen, UserProfile, Contact, Message, NetworkStatus } from '../types';
+import type { Screen, UserProfile, Contact, Message, NetworkStatus } from '@/types';
 
 export const currentScreen = signal<Screen>('auth');
 export const networkStatus = signal<NetworkStatus>('disconnected');

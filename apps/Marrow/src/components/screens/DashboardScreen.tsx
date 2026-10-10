@@ -6,9 +6,9 @@ import {
   Contact,
   Session,
   PublicIdentityDto,
-} from "../../api/tauri";
+} from "@/api/tauri";
 
-import styles from "../../styles/Dashboard/DashboardScreen.module.css";
+import styles from "@/styles/Dashboard/DashboardScreen.module.css";
 
 interface Props {
   identity: PublicIdentityDto;

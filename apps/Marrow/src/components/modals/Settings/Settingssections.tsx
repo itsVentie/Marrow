@@ -1,8 +1,8 @@
 import { useSignal } from "@preact/signals";
 
-import { PublicIdentityDto } from "../../../api/tauri";
+import { PublicIdentityDto } from "@/api/tauri";
 
-import styles from "../../../styles/Settings/SettingsModal.module.css";
+import styles from "@/styles/Settings/SettingsModal.module.css";
 
 export type StubRow =
   | {
