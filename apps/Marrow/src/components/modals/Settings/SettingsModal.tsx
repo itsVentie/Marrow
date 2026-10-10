@@ -1,15 +1,17 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 
-import { PublicIdentityDto } from "@/api/tauri";
+import type { PublicIdentityDto } from "@/api/tauri";
 
 import {
   AboutSection,
   AccountSection,
   StubSection,
-  StubSectionData,
+  type StubSectionData,
 } from "./Settingssections";
 
+import { Web3Section } from "./Sections/Web3Section";
+import { GeneralSection } from "./Sections/GeneralSection";
 import styles from "@/styles/Settings/SettingsModal.module.css";
 
 interface Props {
@@ -19,17 +21,21 @@ interface Props {
 }
 
 type SectionId =
+  | "general"
   | "account"
   | "privacy"
   | "network"
+  | "web3"
   | "notifications"
   | "appearance"
   | "about";
 
 const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: "general", label: "General" },
   { id: "account", label: "My Account" },
-  { id: "privacy", label: "Privacy and Security" },
+  { id: "privacy", label: "Privacy & Security" },
   { id: "network", label: "Network" },
+  { id: "web3", label: "Web3 & Wallets" },
   { id: "notifications", label: "Notifications" },
   { id: "appearance", label: "Appearance" },
   { id: "about", label: "About" },
@@ -61,6 +67,7 @@ const STUB_DATA: Partial<Record<SectionId, StubSectionData>> = {
       },
     ],
   },
+
   network: {
     rows: [
       {
@@ -84,6 +91,7 @@ const STUB_DATA: Partial<Record<SectionId, StubSectionData>> = {
     ],
     note: "Network runtime options can be modified in config.toml [STUB]",
   },
+
   notifications: {
     rows: [
       {
@@ -97,6 +105,7 @@ const STUB_DATA: Partial<Record<SectionId, StubSectionData>> = {
         kind: "toggle",
         id: "notify-previews",
         label: "Show message previews",
+        description: "Show message content in notifications",
         checked: true,
       },
       {
@@ -108,6 +117,7 @@ const STUB_DATA: Partial<Record<SectionId, StubSectionData>> = {
       },
     ],
   },
+
   appearance: {
     rows: [
       {
@@ -126,36 +136,49 @@ const STUB_DATA: Partial<Record<SectionId, StubSectionData>> = {
   },
 };
 
-export function SettingsModal({ identity, onClose, onLogout }: Props) {
+export function SettingsModal({
+  identity,
+  onClose,
+  onLogout,
+}: Props) {
   const section = useSignal<SectionId>("account");
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
         onClose();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
 
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [onClose]);
 
   const currentLabel =
-    SECTIONS.find((s) => s.id === section.value)?.label ?? "";
+    SECTIONS.find((item) => item.id === section.value)?.label ?? "Settings";
 
   const renderSection = () => {
-    if (section.value === "account") {
-      return <AccountSection identity={identity} />;
+    switch (section.value) {
+      case "general":
+        return <GeneralSection />;
+      case "account":
+        return <AccountSection identity={identity} />;
+
+      case "web3":
+        return <Web3Section />;
+
+      case "about":
+        return <AboutSection />;
+
+      default: {
+        const data = STUB_DATA[section.value];
+
+        return data ? <StubSection {...data} /> : null;
+      }
     }
-
-    if (section.value === "about") {
-      return <AboutSection />;
-    }
-
-    const data = STUB_DATA[section.value];
-
-    return data ? <StubSection {...data} /> : null;
   };
 
   return (
@@ -165,27 +188,47 @@ export function SettingsModal({ identity, onClose, onLogout }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-modal-title"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
-        <nav className={styles.sidebar} aria-label="Settings sections">
-          <h4 id="settings-modal-title" className={styles.sidebarTitle}>
+        <nav
+          className={styles.sidebar}
+          aria-label="Settings sections"
+        >
+          <h4
+            id="settings-modal-title"
+            className={styles.sidebarTitle}
+          >
             Settings
           </h4>
 
-          {SECTIONS.map((s) => (
+          {SECTIONS.map((item) => (
             <button
-              key={s.id}
-              className={`${styles.navItem} ${
-                section.value === s.id ? styles.navItemActive : ""
-              }`}
-              aria-current={section.value === s.id ? "page" : undefined}
-              onClick={() => (section.value = s.id)}
+              key={item.id}
+              type="button"
+              className={[
+                styles.navItem,
+                section.value === item.id
+                  ? styles.navItemActive
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              aria-current={
+                section.value === item.id ? "page" : undefined
+              }
+              onClick={() => {
+                section.value = item.id;
+              }}
             >
-              {s.label}
+              {item.label}
             </button>
           ))}
 
-          <button className={styles.logoutBtn} onClick={onLogout}>
+          <button
+            type="button"
+            className={styles.logoutBtn}
+            onClick={onLogout}
+          >
             Log out
           </button>
         </nav>
@@ -195,6 +238,7 @@ export function SettingsModal({ identity, onClose, onLogout }: Props) {
             <h4 className={styles.detailTitle}>{currentLabel}</h4>
 
             <button
+              type="button"
               className={styles.closeBtn}
               onClick={onClose}
               aria-label="Close settings"
@@ -203,7 +247,9 @@ export function SettingsModal({ identity, onClose, onLogout }: Props) {
             </button>
           </div>
 
-          <div className={styles.detailBody}>{renderSection()}</div>
+          <div className={styles.detailBody}>
+            {renderSection()}
+          </div>
         </div>
       </div>
     </div>

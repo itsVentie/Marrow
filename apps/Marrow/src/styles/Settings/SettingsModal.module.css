@@ -401,3 +401,170 @@
     width: 130px;
   }
 }
+.web3Section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.web3Description,
+.web3Warning,
+.web3Status {
+  color: var(--text-secondary, #a3a3b5);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.web3Card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--border-color, #30303d);
+  border-radius: 12px;
+  background: var(--surface-color, #17171f);
+}
+
+.web3Heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.web3Heading span {
+  color: var(--text-secondary, #a3a3b5);
+  font-size: 12px;
+}
+
+.web3Label {
+  color: var(--text-secondary, #a3a3b5);
+  font-size: 12px;
+}
+
+.web3Address {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--background-color, #101016);
+  font-size: 12px;
+}
+
+.web3Actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.web3Actions button {
+  padding: 9px 14px;
+  border: 1px solid var(--border-color, #383846);
+  border-radius: 8px;
+  color: var(--text-color, #eeeeF5);
+  background: var(--surface-color, #20202b);
+  cursor: pointer;
+}
+
+.web3Actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.web3Warning {
+  font-size: 12px;
+}
+.generalSection {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.generalDescription {
+  margin: 0;
+  color: var(--text-secondary, #a3a3b5);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.generalGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.generalGroup h5 {
+  margin: 0 0 10px;
+  color: var(--text-secondary, #a3a3b5);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.generalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border-color, #30303d);
+  cursor: pointer;
+}
+
+.generalRow > span {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.generalRow strong {
+  color: var(--text-color, #eeeeF5);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.generalRow small {
+  color: var(--text-secondary, #a3a3b5);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.generalRow select {
+  max-width: 160px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #383846);
+  border-radius: 8px;
+  color: var(--text-color, #eeeeF5);
+  background: var(--surface-color, #20202b);
+}
+
+.generalRow input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color, #8b5cf6);
+  cursor: pointer;
+}
+
+.generalFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.generalFooter button {
+  padding: 9px 13px;
+  border: 1px solid var(--border-color, #383846);
+  border-radius: 8px;
+  color: var(--text-color, #eeeeF5);
+  background: var(--surface-color, #20202b);
+  cursor: pointer;
+}
+
+.generalRow select:focus-visible,
+.generalRow input:focus-visible,
+.generalFooter button:focus-visible {
+  outline: 2px solid var(--accent-color, #8b5cf6);
+  outline-offset: 3px;
+}

@@ -6,6 +6,7 @@ import { DashboardScreen } from "./components/screens/DashboardScreen";
 import { ChatScreen } from "./components/screens/ChatScreen";
 import { ProfileModal } from "./components/modals/Profile/ProfileModal";
 import { SettingsModal } from "./components/modals/Settings/SettingsModal";
+import { Web3Section } from "./components/modals/Settings/Sections/Web3Section";
 
 export function App() {
   const identity = useSignal<PublicIdentityDto | null>(null);

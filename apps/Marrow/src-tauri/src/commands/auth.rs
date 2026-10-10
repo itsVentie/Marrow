@@ -213,11 +213,7 @@ pub fn create_identity(
     fs::create_dir_all(&app_dir).map_err(map_err_str)?;
 
     let file_path = app_dir.join(&filename);
-
-    // The key file is the only backup of this identity. `create_new` fails if
-    // the file already exists, so an existing identity is never overwritten.
-    // This happens before the DB key or vault are touched, so a refusal
-    // leaves the application state unchanged.
+    
     {
         let mut key_file = fs::OpenOptions::new()
             .write(true)

@@ -112,11 +112,6 @@ pub async fn handle_network_frame(handle: tauri::AppHandle, peer_id: String, dat
                 return;
             }
 
-            // Wait for the request/response layer to confirm that the
-            // handshake response was successfully delivered.
-            //
-            // The response payload itself is not currently used here;
-            // receiving Ok(_) is sufficient to establish the local session.
             match oneshot_rx.await {
                 Ok(Ok(_)) => {}
                 Ok(Err(_)) | Err(_) => return,

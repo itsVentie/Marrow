@@ -426,7 +426,6 @@ mod tests {
     #[test]
     fn same_sequence_number_does_not_overwrite() {
         let (engine, _db) = open_engine();
-        // эпоха 1 и эпоха 2: n начинается заново
         engine
             .store_message(&msg(MessageDirection::Inbound, 0, 1))
             .unwrap();
@@ -455,8 +454,6 @@ mod tests {
     #[test]
     fn legacy_keys_stay_readable_and_new_messages_append_after() {
         let (engine, _db) = open_engine();
-
-        // имитация старой записи: ключ session/{seq:016x}
         let old = msg(MessageDirection::Inbound, 5, 1);
         let enc = engine
             .encrypt_bytes(&bincode::serialize(&old).unwrap())

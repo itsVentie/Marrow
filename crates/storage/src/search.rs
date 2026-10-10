@@ -145,7 +145,6 @@ impl SearchIndex {
     }
 
     fn reset_index_dir(path: &Path) -> Result<(), SearchError> {
-        // Never wipe a directory that is not a Tantivy index.
         if !path.join(INDEX_META_FILE).is_file() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -358,14 +357,12 @@ mod tests {
             .index_message("msg1", "peer_alice", 1000, "secret quantum message")
             .unwrap();
 
-        // Same on-disk index, different key: hashes must not match.
         let different_key = [0x99; 32];
 
         let other_index = SearchIndex::open_or_create(dir.path(), different_key).unwrap();
 
         assert!(other_index.search("quantum", 10).unwrap().is_empty());
 
-        // Sanity check: the right key does find the message.
         assert_eq!(index.search("quantum", 10).unwrap().len(), 1);
     }
 
@@ -417,8 +414,6 @@ mod tests {
     #[test]
     fn test_schema_mismatch_rebuilds_index() {
         let dir = tempdir().unwrap();
-
-        // Simulate an index created by an older version with another schema.
         {
             let mut builder = Schema::builder();
             builder.add_text_field("legacy_field", STRING | STORED);
