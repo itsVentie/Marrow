@@ -13,7 +13,7 @@ import styles from "../../styles/DashboardScreen.module.css";
 interface Props {
   identity: PublicIdentityDto;
   onSelectSession: (session: Session) => void;
-  onLogout: () => void;
+  onOpenSettings: () => void;
 }
 
 interface PluginStub {
@@ -27,7 +27,7 @@ interface PluginStub {
 export function DashboardScreen({
   identity,
   onSelectSession,
-  onLogout,
+  onOpenSettings,
 }: Props) {
   const contacts = useSignal<Contact[]>([]);
   const sessions = useSignal<Session[]>([]);
@@ -39,7 +39,6 @@ export function DashboardScreen({
   const error = useSignal<string | null>(null);
 
   const showProfileModal = useSignal(false);
-  const showSettingsModal = useSignal(false);
   const showPluginsModal = useSignal(false);
   const copiedKey = useSignal(false);
 
@@ -143,13 +142,6 @@ export function DashboardScreen({
     }
   };
 
-  const handleLogoutClick = async () => {
-    await api.logoutIdentity();
-
-    showSettingsModal.value = false;
-    onLogout();
-  };
-
   const handleCopyPubkey = () => {
     navigator.clipboard.writeText(
       identity.pubkey_hex,
@@ -195,9 +187,7 @@ export function DashboardScreen({
           </button>
 
           <button
-            onClick={() =>
-              (showSettingsModal.value = true)
-            }
+            onClick={onOpenSettings}
             className={styles.secondaryBtn}
           >
             Settings
@@ -620,135 +610,6 @@ export function DashboardScreen({
             <button
               onClick={() =>
                 (showPluginsModal.value = false)
-              }
-              className={
-                styles.closeModalBtn
-              }
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showSettingsModal.value && (
-        <div
-          className={
-            styles.modalOverlay
-          }
-          onClick={() =>
-            (showSettingsModal.value = false)
-          }
-        >
-          <div
-            className={
-              styles.modalContent
-            }
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-            <div
-              className={
-                styles.modalHeaderWithBadge
-              }
-            >
-              <h4>Settings</h4>
-
-              <span
-                className={
-                  styles.stubTag
-                }
-              >
-                STUB
-              </span>
-            </div>
-
-            <div
-              className={
-                styles.modalField
-              }
-            >
-              <label>
-                Relay Server Node [STUB]:
-              </label>
-
-              <input
-                type="text"
-                placeholder="127.0.0.1:9090"
-                disabled
-              />
-            </div>
-
-            <div
-              className={
-                styles.modalField
-              }
-            >
-              <label>
-                Local Binding Port [STUB]:
-              </label>
-
-              <input
-                type="text"
-                placeholder="0 (Auto-assigned)"
-                disabled
-              />
-            </div>
-
-            <div
-              className={
-                styles.modalField
-              }
-            >
-              <label>
-                Network Protocol [STUB]:
-              </label>
-
-              <input
-                type="text"
-                placeholder="QUIC over UDP"
-                disabled
-              />
-            </div>
-
-            <p
-              className={
-                styles.stubNotice
-              }
-            >
-              Network runtime options can be
-              modified in config.toml [STUB]
-            </p>
-
-            <div
-              className={
-                styles.dangerZone
-              }
-            >
-              <label
-                className={
-                  styles.dangerLabel
-                }
-              >
-                Session Control:
-              </label>
-
-              <button
-                onClick={
-                  handleLogoutClick
-                }
-                className={
-                  styles.dangerLogoutBtn
-                }
-              >
-                Logout
-              </button>
-            </div>
-
-            <button
-              onClick={() =>
-                (showSettingsModal.value = false)
               }
               className={
                 styles.closeModalBtn

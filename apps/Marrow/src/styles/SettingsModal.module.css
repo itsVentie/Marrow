@@ -1,0 +1,123 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  background: rgba(2, 6, 23, 0.72);
+}
+
+.content {
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #1e293b;
+  color: #e2e8f0;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.stubTag {
+  padding: 2px 8px;
+  border: 1px solid #475569;
+  border-radius: 999px;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.field label {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.field input {
+  padding: 10px 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.field input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.notice {
+  margin: 4px 0 16px;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.dangerZone {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #7f1d1d;
+}
+
+.dangerLabel {
+  font-size: 0.8rem;
+  color: #fca5a5;
+}
+
+.logoutBtn {
+  padding: 10px 14px;
+  border: 1px solid #b91c1c;
+  border-radius: 8px;
+  background: #450a0a;
+  color: #fecaca;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logoutBtn:hover {
+  background: #7f1d1d;
+}
+
+.closeBtn {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  background: #0f172a;
+}

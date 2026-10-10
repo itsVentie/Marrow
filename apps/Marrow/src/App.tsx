@@ -4,10 +4,12 @@ import { api, PublicIdentityDto, Session } from "./api/tauri";
 import { AuthScreen } from "./components/screens/AuthScreen";
 import { DashboardScreen } from "./components/screens/DashboardScreen";
 import { ChatScreen } from "./components/screens/ChatScreen";
+import { SettingsModal } from "./components/modals/SettingsModal";
 
 export function App() {
   const identity = useSignal<PublicIdentityDto | null>(null);
   const activeSession = useSignal<Session | null>(null);
+  const showSettings = useSignal(false);
   const loading = useSignal(true);
 
   useEffect(() => {
@@ -35,6 +37,7 @@ export function App() {
     } finally {
       identity.value = null;
       activeSession.value = null;
+      showSettings.value = false;
     }
   };
 
@@ -60,10 +63,19 @@ export function App() {
   }
 
   return (
-    <DashboardScreen
-      identity={identity.value}
-      onSelectSession={(session: Session) => (activeSession.value = session)}
-      onLogout={handleLogout}
-    />
+    <>
+      <DashboardScreen
+        identity={identity.value}
+        onSelectSession={(session: Session) => (activeSession.value = session)}
+        onOpenSettings={() => (showSettings.value = true)}
+      />
+
+      {showSettings.value && (
+        <SettingsModal
+          onClose={() => (showSettings.value = false)}
+          onLogout={handleLogout}
+        />
+      )}
+    </>
   );
 }
