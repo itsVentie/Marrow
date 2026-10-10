@@ -8,11 +8,12 @@ import {
   PublicIdentityDto,
 } from "../../api/tauri";
 
-import styles from "../../styles/DashboardScreen.module.css";
+import styles from "../../styles/Dashboard/DashboardScreen.module.css";
 
 interface Props {
   identity: PublicIdentityDto;
   onSelectSession: (session: Session) => void;
+  onOpenProfile: () => void;
   onOpenSettings: () => void;
 }
 
@@ -27,6 +28,7 @@ interface PluginStub {
 export function DashboardScreen({
   identity,
   onSelectSession,
+  onOpenProfile,
   onOpenSettings,
 }: Props) {
   const contacts = useSignal<Contact[]>([]);
@@ -38,9 +40,7 @@ export function DashboardScreen({
 
   const error = useSignal<string | null>(null);
 
-  const showProfileModal = useSignal(false);
   const showPluginsModal = useSignal(false);
-  const copiedKey = useSignal(false);
 
   const plugins = useSignal<PluginStub[]>([
     {
@@ -142,18 +142,6 @@ export function DashboardScreen({
     }
   };
 
-  const handleCopyPubkey = () => {
-    navigator.clipboard.writeText(
-      identity.pubkey_hex,
-    );
-
-    copiedKey.value = true;
-
-    setTimeout(() => {
-      copiedKey.value = false;
-    }, 2000);
-  };
-
   const togglePlugin = (id: string) => {
     plugins.value = plugins.value.map((p) =>
       p.id === id
@@ -194,9 +182,7 @@ export function DashboardScreen({
           </button>
 
           <button
-            onClick={() =>
-              (showProfileModal.value = true)
-            }
+            onClick={onOpenProfile}
             className={styles.avatarBtn}
             title="Profile"
           >
@@ -395,118 +381,6 @@ export function DashboardScreen({
           </div>
         </section>
       </div>
-
-      {showProfileModal.value && (
-        <div
-          className={
-            styles.modalOverlay
-          }
-          onClick={() =>
-            (showProfileModal.value = false)
-          }
-        >
-          <div
-            className={
-              styles.modalContent
-            }
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-            <div
-              className={
-                styles.modalHeaderWithBadge
-              }
-            >
-              <h4>Profile</h4>
-            </div>
-
-            <div
-              className={
-                styles.profileCard
-              }
-            >
-              <div
-                className={
-                  styles.avatarWrapper
-                }
-              >
-                <svg
-                  className={styles.avatarSvg}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-                  />
-                </svg>
-
-                <div
-                  className={
-                    styles.statusIndicator
-                  }
-                />
-              </div>
-
-              <div
-                className={
-                  styles.profileDetails
-                }
-              >
-                <span
-                  className={
-                    styles.username
-                  }
-                >
-                  User
-                </span>
-              </div>
-            </div>
-
-            <div
-              className={
-                styles.modalField
-              }
-            >
-              <label>
-                Full Public Key (Hex):
-              </label>
-
-              <textarea
-                readOnly
-                value={identity.pubkey_hex}
-                rows={3}
-              />
-
-              <button
-                onClick={handleCopyPubkey}
-                className={
-                  styles.primaryModalBtn
-                }
-              >
-                {copiedKey.value
-                  ? "Copied!"
-                  : "Copy Public Key"}
-              </button>
-            </div>
-
-            <button
-              onClick={() =>
-                (showProfileModal.value = false)
-              }
-              className={
-                styles.closeModalBtn
-              }
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
       {showPluginsModal.value && (
         <div

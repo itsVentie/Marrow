@@ -4,11 +4,13 @@ import { api, PublicIdentityDto, Session } from "./api/tauri";
 import { AuthScreen } from "./components/screens/AuthScreen";
 import { DashboardScreen } from "./components/screens/DashboardScreen";
 import { ChatScreen } from "./components/screens/ChatScreen";
-import { SettingsModal } from "./components/modals/SettingsModal";
+import { ProfileModal } from "./components/modals/Profile/ProfileModal";
+import { SettingsModal } from "./components/modals/Settings/SettingsModal";
 
 export function App() {
   const identity = useSignal<PublicIdentityDto | null>(null);
   const activeSession = useSignal<Session | null>(null);
+  const showProfile = useSignal(false);
   const showSettings = useSignal(false);
   const loading = useSignal(true);
 
@@ -37,6 +39,7 @@ export function App() {
     } finally {
       identity.value = null;
       activeSession.value = null;
+      showProfile.value = false;
       showSettings.value = false;
     }
   };
@@ -62,13 +65,21 @@ export function App() {
     );
   }
 
-    return (
+  return (
     <>
       <DashboardScreen
         identity={identity.value}
         onSelectSession={(session: Session) => (activeSession.value = session)}
+        onOpenProfile={() => (showProfile.value = true)}
         onOpenSettings={() => (showSettings.value = true)}
       />
+
+      {showProfile.value && (
+        <ProfileModal
+          identity={identity.value}
+          onClose={() => (showProfile.value = false)}
+        />
+      )}
 
       {showSettings.value && (
         <SettingsModal

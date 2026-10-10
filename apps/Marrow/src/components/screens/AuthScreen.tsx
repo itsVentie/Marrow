@@ -1,7 +1,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { api, KeyFileInfoDto, PublicIdentityDto } from "../../api/tauri";
-import styles from "../../styles/AuthScreen.module.css";
+import styles from "../../styles/Auth/AuthScreen.module.css";
 
 interface Props {
   onUnlocked: (identity: PublicIdentityDto) => void;

@@ -1,7 +1,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { api, Session, DecryptedMessageDto } from "../../api/tauri";
-import styles from "../../styles/ChatScreen.module.css";
+import styles from "../../styles/Chat/ChatScreen.module.css";
 
 interface Props {
   session: Session;
