@@ -9,6 +9,7 @@ use r_crypto::Identity;
 use r_network::{NetworkCommand, NetworkEvent, NetworkNode};
 use r_storage::SearchIndex;
 use std::fs;
+use std::io::{ErrorKind, Write};
 use std::path::PathBuf;
 use tauri::{Manager, State};
 
@@ -193,12 +194,6 @@ pub fn create_identity(
         .export_encrypted(password.as_bytes())
         .map_err(map_err_str)?;
 
-    let db_key = derive_db_key(&identity);
-
-    storage.set_encryption_key(db_key);
-
-    storage.save_vault(&vault).map_err(map_err_str)?;
-
     let pubkey_hex = identity.public_hex();
 
     let short_pubkey = &pubkey_hex[..8];
@@ -215,9 +210,36 @@ pub fn create_identity(
 
     let app_dir = app_handle.path().app_data_dir().map_err(map_err_str)?;
 
-    let file_path = app_dir.join(filename);
+    fs::create_dir_all(&app_dir).map_err(map_err_str)?;
 
-    fs::write(&file_path, bytes).map_err(map_err_str)?;
+    let file_path = app_dir.join(&filename);
+
+    // The key file is the only backup of this identity. `create_new` fails if
+    // the file already exists, so an existing identity is never overwritten.
+    // This happens before the DB key or vault are touched, so a refusal
+    // leaves the application state unchanged.
+    {
+        let mut key_file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&file_path)
+            .map_err(|err| {
+                if err.kind() == ErrorKind::AlreadyExists {
+                    format!("Key file '{filename}' already exists; choose another alias")
+                } else {
+                    err.to_string()
+                }
+            })?;
+
+        key_file.write_all(&bytes).map_err(map_err_str)?;
+        key_file.sync_all().map_err(map_err_str)?;
+    }
+
+    let db_key = derive_db_key(&identity);
+
+    storage.set_encryption_key(db_key);
+
+    storage.save_vault(&vault).map_err(map_err_str)?;
 
     {
         let mut identity_guard = state.identity.lock().map_err(map_err_str)?;
