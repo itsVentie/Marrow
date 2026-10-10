@@ -62,7 +62,7 @@ export function App() {
     );
   }
 
-  return (
+    return (
     <>
       <DashboardScreen
         identity={identity.value}
@@ -72,6 +72,7 @@ export function App() {
 
       {showSettings.value && (
         <SettingsModal
+          identity={identity.value}
           onClose={() => (showSettings.value = false)}
           onLogout={handleLogout}
         />
